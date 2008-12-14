@@ -1,0 +1,9 @@
+#!/bin/sh -e 
+
+java -XstartOnFirstThread -cp \
+/Users/chrisn/dev/qtjambi-mac-gpl-4.4.3_01/qtjambi-4.4.3_01.jar:\
+/Users/chrisn/dev/qtjambi-mac-gpl-4.4.3_01/qtjambi-macosx-gcc-4.4.3_01.jar:\
+/Users/chrisn/dev/clojure/trunk/clojure.jar:\
+/Users/chrisn/dev/clojure-contrib/trunk/clojure-contrib.jar:\
+/Users/chrisn/user.clj\
+     clojure.lang.Repl
