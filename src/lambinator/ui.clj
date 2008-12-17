@@ -1,5 +1,5 @@
 (ns lambinator.ui
-  (:import (com.trolltech.qt.gui QApplication QPushButton QFont QFont$Weight)))
+  (:import (com.trolltech.qt.gui QApplication QMainWindow)))
 
 (defn ensure_app_init []
   (try(QApplication/initialize (make-array String 0))(catch RuntimeException e# (println e#))))
@@ -18,12 +18,10 @@
 
 (defn create_app_frame []
   (ensure_app_init)
-  (let [app (QApplication/instance)
-	button (new QPushButton "Go Clojure Go")]
-    (.. button clicked (connect #(exit_exec) "call()"))
-    (doto button
-      (.resize 250 100)
-      (.setFont (new QFont "Deja Vu Sans" 18 (.. QFont$Weight Bold value)))
-      (.setWindowTitle "Go Clojure Go")
-      (.show))
-    button))		      ;return the button for further reference
+  (let [mainWin (new QMainWindow)
+	mbar (. mainWin menuBar)
+	menu (. mbar addMenu "Repl")
+	action (. menu addAction "Back to Repl")]
+    (.. action triggered (connect #(exit_exec) "call()"))
+    (. mainWin show)
+    mainWin))		      ;return the button for further reference
