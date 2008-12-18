@@ -1,9 +1,12 @@
 #!/bin/sh -e 
 
-java -XstartOnFirstThread -cp \
+java -XstartOnFirstThread -Dsun.java2d.opengl=True -cp \
 /Users/chrisn/dev/qtjambi-mac-gpl-4.4.3_01/qtjambi-4.4.3_01.jar:\
 /Users/chrisn/dev/qtjambi-mac-gpl-4.4.3_01/qtjambi-macosx-gcc-4.4.3_01.jar:\
 /Users/chrisn/dev/clojure/trunk/clojure.jar:\
 /Users/chrisn/dev/clojure-contrib/trunk/clojure-contrib.jar:\
-/Users/chrisn/user.clj\
-     clojure.lang.Repl
+/Users/chrisn/dev/editor/lambinator/lambinator.jar:\
+/Users/chrisn/dev/jogl-1.1.1-macosx-universal/lib/jogl.jar:\
+/Users/chrisn/dev/jogl-1.1.1-macosx-universal/lib/gluegen-rt.jar:\
+ -Djava.library.path=/Users/chrisn/dev/jogl-1.1.1-macosx-universal/lib/\
+  clojure.lang.Repl

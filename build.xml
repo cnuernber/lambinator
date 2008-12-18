@@ -8,6 +8,7 @@
 
   <property name="src" location="src"/>
   <property name="build" location="classes"/>
+  <property name="jsrc" location="src/com/trolltech/demos"/>
 
   <available property="hasclojure" file="${clojure.jar}"/>
 
@@ -23,18 +24,36 @@
     <delete file="${jarfile}"/>
     <delete dir="${build}"/>
   </target>
+  <target name="compile_java" depends="init"
+          description="Compile Java sources.">
+    <javac srcdir="${jsrc}" destdir="${build}" 
+           debug="true" target="1.5">
+      <classpath>
+	<path location="${build}"/>
+        <path location="${src}"/>
+        <path location="${clojure.jar}"/>
+	<path location="${qt_jar}"/>
+	<path location="${qt_gcc_jar}"/>
+	<path location="${jogl_jar}"/>
+      </classpath>
+	</javac>
+  </target>
 
-  <target name="compile_lambinator" depends="init"
+  <target name="compile_lambinator" depends="compile_java"
           description="Compile Lambinator sources."
           if="hasclojure">
     <java classname="clojure.lang.Compile">
       <classpath>
-        <path location="${build}"/>
+	<path location="${build}"/>
         <path location="${src}"/>
         <path location="${clojure.jar}"/>
+	<path location="${qt_jar}"/>
+	<path location="${qt_gcc_jar}"/>
+	<path location="${jogl_jar}"/>
       </classpath>
       <sysproperty key="clojure.compile.path" value="${build}"/>
       <arg value="lambinator.experiment"/>
+      <arg value="lambinator.ui"/>
     </java>
   </target>
 
