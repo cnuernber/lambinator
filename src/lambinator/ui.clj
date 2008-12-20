@@ -1,10 +1,4 @@
-(ns lambinator.ui
-  (:import (javax.media.opengl GLJPanel GLEventListener GL)
-	   (javax.swing JFrame JMenu JMenuBar JMenuItem UIManager)
-	   (java.awt BorderLayout)
-	   (java.awt.event ActionListener)
-	   (java.util.regex Pattern)
-	   ))
+(ns lambinator.ui)
 
 (def gl_system_lookup_strs
      '("GL_EXTENSIONS" 

@@ -14,3 +14,6 @@
   (let [cls (Class/forName cls_name)
 	fld (. cls getField fld_name)]
     (when fld (. fld get nil))))
+
+(defmacro sets! [vars & rest]  
+  `(do ~@(map (fn [flds] `(set! (. ~vars ~(first flds)) ~(second flds))) (apply array-map rest))))
