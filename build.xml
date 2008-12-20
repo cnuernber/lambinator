@@ -24,22 +24,7 @@
     <delete file="${jarfile}"/>
     <delete dir="${build}"/>
   </target>
-  <target name="compile_java" depends="init"
-          description="Compile Java sources.">
-    <javac srcdir="${jsrc}" destdir="${build}" 
-           debug="true" target="1.5">
-      <classpath>
-	<path location="${build}"/>
-        <path location="${src}"/>
-        <path location="${clojure.jar}"/>
-	<path location="${qt_jar}"/>
-	<path location="${qt_gcc_jar}"/>
-	<path location="${jogl_jar}"/>
-      </classpath>
-	</javac>
-  </target>
-
-  <target name="compile_lambinator" depends="compile_java"
+  <target name="compile_lambinator" depends="init"
           description="Compile Lambinator sources."
           if="hasclojure">
     <java classname="clojure.lang.Compile">
@@ -54,6 +39,7 @@
       <sysproperty key="clojure.compile.path" value="${build}"/>
       <arg value="lambinator.experiment"/>
       <arg value="lambinator.ui"/>
+      <arg value="lambinator.util"/>
     </java>
   </target>
 
@@ -62,6 +48,7 @@
       <path location="CPL.TXT"/>
       <fileset dir="${src}" includes="**/*.clj"/>
       <fileset dir="${build}" includes="**/*.class"/>
+      <fileset dir="${src}" includes="data/**/*.*"/>
       <manifest>
         <attribute name="Class-Path" value="."/>
       </manifest>
