@@ -39,6 +39,8 @@
       <sysproperty key="clojure.compile.path" value="${build}"/>
       <arg value="lambinator.experiment"/>
       <arg value="lambinator.ui"/>
+      <arg value="lambinator.rc"/>
+      <arg value="lambinator.rcgl"/>
       <arg value="lambinator.util"/>
     </java>
   </target>
