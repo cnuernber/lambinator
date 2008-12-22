@@ -36,7 +36,8 @@
 ;Colors- floating point, 0.0-1.0 (greater than 1.0 is allowed for some
 ;operations)
 (def texture_formats [:rgba :rgb :alpha :lum :lum_alpha])
-(def texture_types [:ubyte :byte :ushort :short :float :half_float] )
+(def texture_types [:ubyte :short :float :half_float] ) ;values used for
+(def surface_depth_types [:16 :24 :32 :none] ) ;values used for depth_bits
 (defstruct texture_spec :texture_type :format :size)
 (defstruct mipmapped_texture_spec :texture :mipmap_count)
 ;cube maps can have mipmapped textures specified as their
