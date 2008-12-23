@@ -68,7 +68,8 @@
    (fn [idx]
      (let [ctx_src (all_surfaces idx)
 	   ctx_spec (ctx_src :surface_spec)]
-       (surface_details_match ctx_spec surface_spec)))
+       (and (surface_details_match ctx_spec surface_spec)
+	    (> (ctx_src :gl_handle) 0))))
    unused_surfaces))
 
 (defn find_best_context_surface [all_surfaces unused_surfaces surface_spec]
@@ -79,6 +80,17 @@
 					      idx surface_spec))
 	    -1 
 	    possible_unused )))
+
+;return the index of the unused handle a new all_surfaces list
+(defn find_empty_context_surface[all_surfaces]
+  (let [indexed_items (map list all_surfaces (iterate inc 0))
+	filtered_items (filter #(== 0 ((first %) :gl_handles)) indexed_items)
+	unused (first filtered_items)]
+    (if unused
+      [(second unused) all_surfaces]
+      (let [retval (count all_surfaces) 
+	    new_all_surfaces (conj all_surfaces nil)]
+	  [retval new_all_surfaces]))))
 
 ;A lot of gl calls have the form of
 ;fn( int number, array ret_data, int offset )
@@ -212,11 +224,18 @@
 
 ;Releases opengl resources related to the context surface
 ;sets gl handle to an invalid value.
-(defn release_context_surface [gl context_surface]
+(defn internal_release_context_surface [gl context_surface]
   (create_context_surface 
    (context_surface :surface_spec) 
    (context_surface :texture_index) 
    (release_opengl_framebuffer_object gl (context_surface :gl_handle))))
+
+;release the context surface.
+;returns the new list of all surfaces
+(defn release_context_surface[gl index all_surfaces]
+  (let [context_surface (all_surfaces index)
+	new_surface (internal_release_context_surface gl context_surface)]
+    (assoc all_surfaces index new_surface)))
  
 ;returns a new context_surface and a new context_textures_list
 ;as it updates the context texture to reflect the new width and height
@@ -225,7 +244,7 @@
   (let [context_texture_index (context_surface :texture_index) ;which texture is this context using
 	context_texture (context_textures_list context_texture_index) ;get that texture
 	tex_handle (context_texture :gl_handle) ;get its texture handle
-	context_surface (release_context_surface gl context_surface) ;create new invalid contex surface
+	context_surface (internal_release_context_surface gl context_surface) ;create new invalid contex surface
 	context_surface_spec (context_surface :surface_spec) ;get old surface spec
 	context_texture_spec (context_surface_spec :texture_spec) ;get old texture spec
 	surface_texture_spec (surface_spec :texture_spec) ;get new texture spec
@@ -278,9 +297,9 @@
 	unused_surfaces (surface_manager :unused_surfaces)
 	best (find_best_context_surface all_surfaces unused_surfaces)]
     (if (== best -1)
-      (let [retval (count all_surfaces)
+      (let [[retval new_all_surfaces] (find_empty_context_surface all_surfaces)
 	    [new_context_surface new_context_texture] (allocate_opengl_framebuffer_object gl surface_spec count)
-	    new_all_surfaces (conj all_surfaces new_context_surface)
+	    new_all_surfaces (assoc new_all_surfaces retval new_context_surface)
 	    new_surface_manager (create_surface_manager new_all_surfaces unused_surfaces)
 	    new_context_textures_list (conj context_textures_list new_context_texture)]
 	[new_surface_manager new_context_textures_list retval])

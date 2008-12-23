@@ -9,11 +9,11 @@
        (create_context_surface 
 	(create_surface_spec 16 false 
 			     (create_texture_spec :rgba :ubyte size size))
-	0 0)
+	0 1)
        (create_context_surface
 	(create_surface_spec 16 false 
 			     (create_texture_spec :rgb :ubyte size size))
-	0 0)])
+	0 1)])
     [100 200 300 400])))
 
 (defn create_test_surfaces_manager []
@@ -40,7 +40,20 @@
 		 (create_surface_spec 
 		  16 false 
 		  (create_texture_spec :lum_alpha :ubyte 300 300)))
-		nil))))
+		nil))
+	   ;change one of the surfaces to be unused
+	   (let [old_surface (all_surfaces 4)
+		 new_surface (create_context_surface 
+			      (old_surface :surface_spec)
+			      (old_surface :texture_index)
+			      0)
+		 all_surfaces (assoc all_surfaces 4 new_surface)]
+	     (is (= 
+		  (filter_possible_context_surfaces 
+		   all_surfaces unused_surfaces
+		   ((all_surfaces 0) :surface_spec))
+		  (list 0 2 6))))
+	   ))
 
 (deftest test_context_surface_matches_better []
 	 (let [mgr (create_test_surfaces_manager)
