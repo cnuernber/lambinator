@@ -8,11 +8,16 @@
 (defn create_texture_manager [textures]
   (struct texture_manager textures))
 
-(defn create_context_surface [surface_spec texture_index gl_handle]
-  (struct context_surface 
-	  surface_spec 
-	  texture_index 
-	  gl_handle))
+(defn create_context_surface 
+  ( [surface_spec texture_index gl_handle complete]
+      (struct context_surface 
+	      surface_spec 
+	      texture_index 
+	      gl_handle
+	      complete))
+  ( [surface_spec texture_index gl_handle]
+      (create_context_surface surface_spec texture_index gl_handle "uknown")))
+      
 
 (defn create_surface_manager [all_surfaces unused_surfaces]
   (struct surface_manager all_surfaces unused_surfaces))
@@ -83,14 +88,8 @@
 
 ;return the index of the unused handle a new all_surfaces list
 (defn find_empty_context_surface[all_surfaces]
-  (let [indexed_items (map list all_surfaces (iterate inc 0))
-	filtered_items (filter #(== 0 ((first %) :gl_handles)) indexed_items)
-	unused (first filtered_items)]
-    (if unused
-      [(second unused) all_surfaces]
-      (let [retval (count all_surfaces) 
-	    new_all_surfaces (conj all_surfaces nil)]
-	  [retval new_all_surfaces]))))
+  (util_find_next_matching_index all_surfaces 
+				 #(== 0 (% :gl_handles)) (fn [] nil)))
 
 ;A lot of gl calls have the form of
 ;fn( int number, array ret_data, int offset )
@@ -178,6 +177,18 @@
 (defn gl_external_format_from_texture_spec [spec]
   (gl_external_format_from_texture_type (spec :texture_type)))
 
+(defmulti gl_external_datatype_from_texture_format identity)
+(defmethod gl_external_datatype_from_texture_format :default [arg] GL/GL_UNSIGNED_BYTE )
+(defmethod gl_external_datatype_from_texture_format :short [arg] GL/GL_UNSIGNED_SHORT )
+(defmethod gl_external_datatype_from_texture_format :half_float [arg] GL/GL_HALF_FLOAT_ARB )
+(defmethod gl_external_datatype_from_texture_format :float [arg] GL/GL_FLOAT )
+
+(defn gl_external_datatype_from_texture_spec [spec]
+  (gl_external_datatype_from_texture_format (spec :format)))
+
+(defn gl_external_format_from_texture_spec [spec]
+  (gl_external_format_from_texture_type (spec :texture_type)))
+
 (defmulti convert_depth_bits_to_gl_constant identity)
 (defmethod convert_depth_bits_to_gl_constant :default [arg] GL/GL_DEPTH_COMPONENT24)
 (defmethod convert_depth_bits_to_gl_constant :16      [arg] GL/GL_DEPTH_COMPONENT16)
@@ -189,37 +200,40 @@
 	fbo_handle (allocate_opengl_framebuffer_object gl)
 	internal_format (gl_internal_format_from_texture_spec texture_spec)
 	external_format (gl_external_format_from_texture_spec texture_spec)
+	external_datatype (gl_external_datatype_from_texture_spec texture_spec) 
 	[width height] (texture_spec :size)
 	depth_bits (surface_spec :depth_bits)]
     ;game on
-    (. gl glBindFramebufferEXT fbo_handle)
+    (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo_handle)
     (. gl glBindTexture GL/GL_TEXTURE_2D tex_handle)
     ;allocate space on the card...
-    (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal_format width height 0 external_format nil)
+    (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal_format width height 0 external_format external_datatype nil)
     (. gl glFramebufferTexture2DEXT 
        GL/GL_FRAMEBUFFER_EXT GL/GL_COLOR_ATTACHMENT0_EXT GL/GL_TEXTURE_2D 
        tex_handle 0)
     (when (not (= :none depth_bits))
       (let [depth_constant (convert_depth_bits_to_gl_constant depth_bits)
 	    depth_buffer (allocate_opengl_framebuffer_renderbuffer gl)]
-	(. gl glBindRenderbufferEXT depth_buffer)
+	(. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT depth_buffer)
 	(. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT depth_constant width height)
 	(. gl glFramebufferRenderbufferEXT 
 	   GL/GL_FRAMEBUFFER_EXT GL/GL_DEPTH_ATTACHMENT_EXT GL/GL_RENDERBUFFER_EXT depth_buffer)))
+    (let [bufComplete (. gl glCheckFramebufferStatusEXT GL/GL_FRAMEBUFFER_EXT)
+	  bufCompleteName (get_opengl_constant_name bufComplete)]
     ;omitting status check for now until I figure some sequence of formats I can
     ;run through
-    (. gl glBindFramebufferEXT 0)
-    (create_context_surface surface_spec texture_index fbo_handle)))
+      (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)
+      (create_context_surface surface_spec texture_index fbo_handle bufCompleteName))))
   
        
 ;Takes a gl, a surface spec, and a count of the number of texture currently allocated
 ;returns a context_surface and a context_texture
-(defn allocate_opengl_framebuffer_object [gl surface_spec context_texture_count]
+(defn context_surface_allocate_opengl_framebuffer_object [gl surface_spec context_texture_count]
   (let [texture_index context_texture_count
 	texture_spec (surface_spec :texture_spec)
 	context_texture (allocate_opengl_texture gl texture_spec)
 	tex_handle (context_texture :gl_handle)]
-    [(internal_allocate_opengl_framebuffer_object texture_index tex_handle surface_spec)
+    [(internal_allocate_opengl_framebuffer_object gl texture_index tex_handle surface_spec)
      context_texture]))
 
 ;Releases opengl resources related to the context surface
@@ -236,6 +250,12 @@
   (let [context_surface (all_surfaces index)
 	new_surface (internal_release_context_surface gl context_surface)]
     (assoc all_surfaces index new_surface)))
+
+
+;takes the unused list, adds the index to it and
+;returns a new unused list.
+(defn mark_context_surface_unused [index unused]
+  (conj unused index))
  
 ;returns a new context_surface and a new context_textures_list
 ;as it updates the context texture to reflect the new width and height
@@ -292,20 +312,21 @@
 ;that *may* need to be re-allocated if its width or height is less than
 ;specified in the surface spec. IT should return a new list of all surfaces
 ;or the current list if no allocation is desired.
-(defn allocate_context_surface [gl surface_manager surface_spec context_textures_list]
+(defn allocate_context_surface [gl surface_manager context_textures_vector surface_spec ]
   (let [all_surfaces (surface_manager :all_surfaces)
 	unused_surfaces (surface_manager :unused_surfaces)
-	best (find_best_context_surface all_surfaces unused_surfaces)]
+	best (find_best_context_surface all_surfaces unused_surfaces surface_spec)]
     (if (== best -1)
       (let [[retval new_all_surfaces] (find_empty_context_surface all_surfaces)
-	    [new_context_surface new_context_texture] (allocate_opengl_framebuffer_object gl surface_spec count)
+	    texture_index (count context_textures_vector)
+	    [new_context_surface new_context_texture] (context_surface_allocate_opengl_framebuffer_object gl surface_spec texture_index )
 	    new_all_surfaces (assoc new_all_surfaces retval new_context_surface)
 	    new_surface_manager (create_surface_manager new_all_surfaces unused_surfaces)
-	    new_context_textures_list (conj context_textures_list new_context_texture)]
+	    new_context_textures_list (conj context_textures_vector new_context_texture)]
 	[new_surface_manager new_context_textures_list retval])
       (let [[new_context_surface new_context_textures_list] (reallocate_context_surface_if_necessary 
 							     gl best all_surfaces surface_spec
-							     context_textures_list)
+							     context_textures_vector)
 	    new_unused_surfaces (filter #(== best %) unused_surfaces)
 	    new_all_surfaces (assoc all_surfaces best new_context_surface)
 	    new_surface_manager (create_surface_manager new_all_surfaces new_unused_surfaces)]

@@ -7,7 +7,7 @@
 ;surfaces is a vector of all the known surfaces
 ;unused is a linked list of the unused surfaces
 ;render size may be <= surface size
-(defstruct context_surface :surface_spec :texture_index :gl_handle)
+(defstruct context_surface :surface_spec :texture_index :gl_handle :framebuffer_complete )
 
 (defstruct surface_manager :all_surfaces :unused_surfaces)
 
