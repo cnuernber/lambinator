@@ -144,11 +144,56 @@
 				       :rgb :ubyte 300 300)))
 		1))
 	   ))
-	       
-	   
-	   
-	   
-	   
 
+(defn do_test_render_context_fbo []
+  (let [gl (create_gl_mock_object)
+	rc (create_render_context)
+	sspec (create_surface_spec 
+	       :24 false
+	       (create_texture_spec :rgba :ubyte 400 300))
+	[rc idx] (rcgl_allocate_fbo gl rc sspec)
+	surface_manager (rc :surface_manager)
+	texture_manager (rc :texture_manager)]
+    (is (== idx 0))
+    (is (== (((surface_manager :all_surfaces) 0) :gl_handle)
+	    1))
+    (is (== (((texture_manager :textures) 0) :gl_handle)
+	    1))
+    (is (= nil (first (surface_manager :unused_surfaces))))
+    (let [rc (rcgl_mark_fbo_unused gl rc 0)
+	  surface_manager1 (rc :surface_manager)
+	  texture_manager1 (rc :texture_manager)]
+      (is (== (first (surface_manager1 :unused_surfaces)) 0))
+      (let [sspec (create_surface_spec
+		   :24 false
+		   (create_texture_spec :rgba :ubyte 800 600))
+	    [rc idx] (rcgl_allocate_fbo gl rc sspec) ;force a reallocation
+	    surface_manager2 (rc :surface_manager)
+	    texture_manager2 (rc :texture_manager)]
+	(is (== (((surface_manager2 :all_surfaces) 0) :gl_handle)
+		1))
+	(is (== (((texture_manager2 :textures) 0) :gl_handle)
+		1))
+	(is (= nil (first (surface_manager2 :unused_surfaces))))
+	(let [rc (rcgl_destroy_fbo gl rc 0)
+	      surface_manager3 (rc :surface_manager)
+	      texture_manager3 (rc :texture_manager)]
+	  (is (not (== (((surface_manager3 :all_surfaces) 0) :gl_handle)
+		       1)))
+	  (is (== (((texture_manager3 :textures) 0) :gl_handle)
+		   1))
+	  (is (not (surface_manager3 :unused_surfaces)))
+	  (let [[rc idx] (rcgl_allocate_fbo gl rc sspec)]
+	    (is (== idx 0))
+	    (let [rc (rcgl_mark_fbo_unused gl rc 0)
+		  [rc idx] (rcgl_allocate_fbo gl rc sspec)]
+	      (is (== idx 0))
+	      (is (== (((surface_manager :all_surfaces) 0) :gl_handle)
+		      1))
+	      (is (== (((texture_manager :textures) 0) :gl_handle)
+		      1))
+	      (is (= nil (first (surface_manager :unused_surfaces))))
+	      )))))))
 
-	 
+(deftest test_render_context_fbo []
+	 (do_test_render_context_fbo))
