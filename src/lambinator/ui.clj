@@ -2,6 +2,7 @@
   (:import (javax.media.opengl GLJPanel GLEventListener GL)
 	   (javax.swing JFrame JMenu JMenuBar JMenuItem UIManager JDialog JLabel
 			JScrollPane ScrollPaneConstants JTextField JTextPane)
+	   (javax.swing.text.html HTMLEditorKit)
 	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension)
 	   (java.awt.event ActionListener)
 	   (java.util.regex Pattern)

@@ -81,8 +81,10 @@
 ;crazy.  Why can't you select and copy any text in a UI?
 (defn create_label [text]
   (let [field (JTextPane.)]
+    (try 
+     (. field setEditorKit (HTMLEditorKit. ))
+     (catch NullPointerException e)) ;don't care
     (doto field
-      (.setContentType "text/html")
       (.setText text)
       (.setBorder nil)
       (.setOpaque false)

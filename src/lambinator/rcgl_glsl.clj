@@ -73,7 +73,8 @@
 	len_buf (gensym)
 	size_buf (gensym)
 	type_buf (gensym)
-	idx (gensym)]
+	idx (gensym)
+	item (gensym)]
     `(let [~item_count (get_gl_program_int_variable ~gl ~program ~active_int)
 	   ~max_name_len (get_gl_program_int_variable ~gl ~program ~max_name_len_int)
 	   ~name_byte_buf (make-array Byte/TYPE ~max_name_len)
@@ -83,13 +84,14 @@
        ;found a hard bug in here.  The map returns a lazy seq.  Thus if you access it
        ;from outside the gl thread then you cause a bus error and java completely crashes.
        ;for evaluation of anything in these files lazyiness is definitely not your friend.
-       (doall (map (fn [~idx] 
-		     (. ~gl ~get_mber_fn ~program ~idx ~max_name_len ~len_buf 0 ~size_buf 0 ~type_buf 0 ~name_byte_buf 0)
-		     (struct rcgl_glsl_item 
-			     (String. ~name_byte_buf 0 (aget ~len_buf 0)) 
-			     ~idx (aget ~size_buf 0) (aget ~type_buf 0)
-			     (get_opengl_constant_name (aget ~type_buf 0))))
-		   (range ~item_count))))))
+       (apply hash-map (doall (mapcat (fn [~item] [(~item :name) ~item]) 
+				      (map (fn [~idx] 
+					     (. ~gl ~get_mber_fn ~program ~idx ~max_name_len ~len_buf 0 ~size_buf 0 ~type_buf 0 ~name_byte_buf 0)
+					     (struct rcgl_glsl_item 
+						     (String. ~name_byte_buf 0 (aget ~len_buf 0)) 
+						     ~idx (aget ~size_buf 0) (aget ~type_buf 0)
+						     (get_opengl_constant_name (aget ~type_buf 0))))
+					   (range ~item_count))))))))
  	    
   
 
@@ -111,3 +113,17 @@
 	      uniforms (glsl_get_program_items gl program GL/GL_ACTIVE_UNIFORMS GL/GL_ACTIVE_UNIFORM_MAX_LENGTH glGetActiveUniform)]
 	  (assoc retval :attributes attributes :uniforms uniforms))
 	retval))))
+
+(defmulti rcgl_set_glsl_uniform (fn [gl uniform_entry var_value] (uniform_entry :datatype)))
+;should log that nothing got set.
+(defmethod rcgl_set_glsl_uniform :default [&args] )
+(defmethod rcgl_set_glsl_uniform GL/GL_FLOAT [#^GL gl entry var_value]
+  (. gl glUniform1f (entry :index) var_value))
+
+(defn rcgl_set_glsl_prog_uniforms [gl var_pair_seq rcgl_glsl_program]
+  (let [{ gl_handle :gl_handle uniforms :uniforms } rcgl_glsl_program]
+    (doseq [[vname vvalue] var_pair_seq]
+      (let [uniform_entry (uniforms vname)]
+	(when uniform_entry
+	  (rcgl_set_glsl_uniform gl uniform_entry vvalue))))))
+	  
