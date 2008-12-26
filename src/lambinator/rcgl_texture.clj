@@ -1,5 +1,14 @@
 (in-ns 'lambinator.rcgl)
 
+(defstruct context_texture :texture_spec :gl_handle)
+
+(defn create_context_texture [texture_spec gl_handle]
+  (struct context_texture texture_spec gl_handle))
+
+(defstruct texture_manager :textures )
+
+(defn create_texture_manager [textures]
+  (struct texture_manager textures))
 	
 ;takes a gl, a texture spec,
 ;and returns a context_texture

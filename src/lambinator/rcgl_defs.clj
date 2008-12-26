@@ -2,21 +2,6 @@
 ;Simple render context implementation that binds the
 ;render commands to sets of opengl calls
 
-(defn create_context_texture [texture_spec gl_handle]
-  (struct context_texture texture_spec gl_handle))
-
-(defn create_texture_manager [textures]
-  (struct texture_manager textures))
-
-(defn create_context_surface 
-  ( [surface_spec texture_index gl_handle complete]
-      (struct context_surface 
-	      surface_spec 
-	      texture_index 
-	      gl_handle
-	      complete))
-  ( [surface_spec texture_index gl_handle]
-      (create_context_surface surface_spec texture_index gl_handle "uknown")))
 
 ;The caches, fbo, texture, and shaders have reusable entries to some extent.
 ;this wraps the concept of finding the best entry if it exists else creating
@@ -26,9 +11,6 @@
     (if (best_valid_fn best_result)
       (recreate_fn best_result)
       (new_fn best_result))))
-
-(defn create_surface_manager [all_surfaces unused_surfaces]
-  (struct surface_manager all_surfaces unused_surfaces))
 
 (defn sspec_from_context_surface_index [all_surfaces idx]
   ((all_surfaces idx) :surface_spec))

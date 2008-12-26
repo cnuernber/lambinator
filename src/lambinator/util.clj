@@ -31,3 +31,7 @@
       (let [idx (count items)
 	   new_items (conj items (default_fn))]
 	[idx new_items]))))
+
+(defn current_thread_id[]
+  (let [thread (Thread/currentThread)]
+    (. thread getId)))

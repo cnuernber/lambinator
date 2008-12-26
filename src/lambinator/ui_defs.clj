@@ -1,43 +1,31 @@
 (in-ns 'lambinator.ui)
-(import '(javax.media.opengl GLJPanel GLEventListener GL))
-(import '(javax.swing JFrame JMenu JMenuBar JMenuItem UIManager JDialog JLabel
-		      JScrollPane ScrollPaneConstants JTextField JTextPane))
-(import	'(java.awt BorderLayout GridBagLayout GridBagConstraints Dimension))
-(import '(java.awt.event ActionListener))
-(import	'(java.util.regex Pattern))
-(use 'lambinator.util)
 
 ;File to define definitions that should be reset while editing
 ;the ui system.  The static definitions shouldn't be
 ;else you loose the definition of the system vars
 ;and various other static info.
 
-;this file should be mainly functions
+(defonce gl_system_lookup_strs
+  '("GL_EXTENSIONS" 
+    "GL_VENDOR"
+    "GL_RENDERER"
+    "GL_VERSION"))
 
+(defn get_supported_gl_extensions [gl_system_strs_ref]
+  (re-seq (Pattern/compile "\\S+") (@gl_system_strs_ref "GL_EXTENSIONS")))
 
-(defn get_supported_gl_extensions []
-  (re-seq (Pattern/compile "\\S+") (@gl_system_strs "GL_EXTENSIONS")))
-
-(defn get_sorted_concatenated_gl_extensions []
-     (. (reduce 
-	 (fn [bldr str] (when (. bldr length) (. bldr append "\n")) (. bldr append str) bldr) 
-	 (StringBuilder.) 
-	 (sort (get_supported_gl_extensions)))
-	toString ))
-
-(defn get_sorted_htmlized_gl_extensions []
+(defn get_sorted_htmlized_gl_extensions [gl_system_strs_ref]
   (let [bldr (StringBuilder.)]
     (. bldr append "<html>")
     (reduce 
      (fn [bldr str] (when (> (. bldr length) 6) (. bldr append "<BR>")) (. bldr append str) bldr) 
      bldr 
-     (sort (get_supported_gl_extensions)))
+     (sort (get_supported_gl_extensions gl_system_strs_ref)))
     (. bldr append "</html>")
     (. bldr toString )))
-    
 
-(defn update_gl_system_strs [drawable]
-  (let [sys_strs @gl_system_strs
+(defn update_gl_system_strs [drawable gl_system_strs_ref] 
+  (let [sys_strs @gl_system_strs_ref
 	keys gl_system_lookup_strs
 	gl (. drawable getGL)]
     (let [newStrs (reduce 
@@ -45,35 +33,49 @@
 			   (. gl glGetString 
 			      (get_static_field_value "javax.media.opengl.GL" %2))) 
 		   sys_strs keys)]
-      (dosync (ref-set gl_system_strs newStrs)))))
+      (dosync (ref-set gl_system_strs_ref newStrs)))))
 
+(defn add_gl_todo_item [gl_todo_list_ref item]
+  (dosync (ref-set gl_todo_list_ref (conj @gl_todo_list_ref item))))
 
-;function callable with one argument; the gl interface
-(defn add_gl_todo_item [item]
-  (dosync (ref-set gl_todo_list (cons item @gl_todo_list))))
+(defn gl_init [drawable gl_system_strs_ref]
+  (update_gl_system_strs drawable gl_system_strs_ref))
 
-(defn gl_init [drawable]
-  (update_gl_system_strs drawable))
+;Important that this gets wrapped in a try/catch
+;if it doesn't, then you loose your ability to run the
+;display method!
+(defn run_gl_todo_item[drawable item render_exceptions_ref]
+  (try
+   (item drawable)
+   (catch Exception e
+     (dosync (ref-set render_exceptions_ref (conj @render_exceptions_ref e))))))
 
-(defn gl_display [drawable]
-  (let [todoItems @gl_todo_list]
-    (dosync (ref-set gl_todo_list nil))
-    (let [tempItem (map #(apply %1 (list drawable)) todoItems)]
-      (dorun tempItem))))
+(defn gl_display [drawable gl_todo_list_ref render_exceptions_ref]
+  (let [todoItems @gl_todo_list_ref]
+    (dosync (ref-set gl_todo_list_ref nil))
+    (doseq [item todoItems]
+      (run_gl_todo_item drawable item render_exceptions_ref) todoItems)))
 
-(defn gl_display_changed [drawable modelChanged devChanged]
-  (println "gl display changed"))
+(defn gl_display_changed [drawable modelChanged devChanged])
 
-(defn gl_reshape [drawable x y width height])
+(defn gl_reshape [drawable x y width height gl_dimensions_ref]
+  (dosync (ref-set gl_dimensions_ref [x y width height])))
 
-(defn create_gl_event_listener []
+(defn create_gl_event_listener 
+  [render_exceptions_ref 
+   gl_dimensions_ref 
+   gl_system_strs_ref 
+   gl_todo_items_ref]
   (proxy [Object GLEventListener]
 	  []
-	(display [dble] (gl_display dble))
+	(init [dble] (gl_init dble gl_system_strs_ref))
+
+	(display [dble] (gl_display dble gl_todo_items_ref gl_system_strs_ref))
+
 	(displayChanged [dble modeChanged devChanged]
 			(gl_display_changed dble modeChanged devChanged ))
-	(init [dble] (gl_init dble))
-	(reshape [dble x y width height] (gl_reshape dble x y width height))))
+
+	(reshape [dble x y width height] (gl_reshape dble x y width height gl_dimensions_ref))))
 
 ;jlabels aren't selectable and copyable, which drives me fucking
 ;crazy.  Why can't you select and copy any text in a UI?
@@ -87,8 +89,8 @@
       (.setEditable false))
     field))
 
-(defn create_scrollable_extensions_label []
-  (let [text (get_sorted_htmlized_gl_extensions)
+(defn create_scrollable_extensions_label [gl_system_strs_ref]
+  (let [text (get_sorted_htmlized_gl_extensions gl_system_strs_ref)
 	lbl (create_label text)
 	pane (JScrollPane. lbl 
 			   ScrollPaneConstants/VERTICAL_SCROLLBAR_AS_NEEDED
@@ -98,10 +100,10 @@
 (defmacro add_with_constraints [item constraints parent & rest]
 	`(do (sets! ~constraints ~@rest) (. ~parent add ~item ~constraints)))
 
-(defn get_gl_system_property [name]
-  (@gl_system_strs name))
+(defn get_gl_system_property [name gl_system_strs_ref]
+  (@gl_system_strs_ref name))
 
-(defn display_opengl_properties [frame]
+(defn display_opengl_properties [frame gl_system_strs_ref]
   ;open up something to display the system properties
   (let [dlg (JDialog. frame "Open GL Information")
 	constraints (GridBagConstraints.) ]
@@ -112,7 +114,7 @@
 			  gridy 0
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_label (get_gl_system_property "GL_VERSION")) constraints dlg
+    (add_with_constraints (create_label (get_gl_system_property "GL_VERSION" gl_system_strs_ref)) constraints dlg
 			  gridx 1
 			  gridy 0
 			  anchor GridBagConstraints/NORTHWEST
@@ -122,7 +124,7 @@
 			  gridy 1
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_label (get_gl_system_property "GL_VENDOR")) constraints dlg
+    (add_with_constraints (create_label (get_gl_system_property "GL_VENDOR" gl_system_strs_ref)) constraints dlg
 			  gridx 1
 			  gridy 1
 			  anchor GridBagConstraints/NORTHWEST
@@ -132,17 +134,17 @@
 			  gridy 2
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_label (get_gl_system_property "GL_RENDERER")) constraints dlg
+    (add_with_constraints (create_label (get_gl_system_property "GL_RENDERER" gl_system_strs_ref)) constraints dlg
 			  gridx 1
 			  gridy 2
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add_with_constraints (create_label "Extensions") constraints dlg
+    (add_with_constraints (create_label "Extensions" ) constraints dlg
 			  gridx 0
 			  gridy 3
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_scrollable_extensions_label) constraints dlg
+    (add_with_constraints (create_scrollable_extensions_label gl_system_strs_ref) constraints dlg
 			  gridx 1
 			  gridy 3
 			  weightx 1.0
@@ -159,32 +161,10 @@
       []
     (actionPerformed 
      [evt]
-     (apply lmbda (list evt)))))
+     (apply lmbda [evt]))))
 
 (defn create_menu_item [title lmbda parent]
   (let [item (JMenuItem. title)]
     (. item addActionListener (create_action_listener lmbda))
     (. parent add item)
     item))
-	
-
-
-(defn create_app_frame []
-  (let [appName "Lambit up"]
-    (. (System/getProperties) setProperty "apple.laf.useScreenMenuBar" "true")
-    (. (System/getProperties) 
-       setProperty "com.apple.mrj.application.apple.menu.about.name" appName)
-    (UIManager/setLookAndFeel (UIManager/getSystemLookAndFeelClassName))
-    (let [frame (JFrame. appName)
-	  panel (GLJPanel. )
-	  bar (JMenuBar.)
-	  menu (JMenu. "About")]
-      (.. frame getContentPane (setLayout (BorderLayout.)))
-      (.. frame getContentPane (add panel))
-      (. panel addGLEventListener (create_gl_event_listener))
-      (. bar add menu)
-      (create_menu_item "OpenGL" (fn [ignored] (display_opengl_properties frame)) menu)
-      (. frame setJMenuBar bar)
-      (. frame show)
-      (def main_frame frame)
-      frame)))

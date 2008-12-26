@@ -1,5 +1,25 @@
 (in-ns 'lambinator.rcgl)
 
+;surfaces is a vector of all the known surfaces
+;unused is a linked list of the unused surfaces
+;render size may be <= surface size
+(defstruct context_surface :surface_spec :texture_index :gl_handle :framebuffer_complete )
+
+(defn create_context_surface 
+  ( [surface_spec texture_index gl_handle complete]
+      (struct context_surface 
+	      surface_spec 
+	      texture_index 
+	      gl_handle
+	      complete))
+  ( [surface_spec texture_index gl_handle]
+      (create_context_surface surface_spec texture_index gl_handle "unknown")))
+
+(defstruct surface_manager :all_surfaces :unused_surfaces)
+
+(defn create_surface_manager [all_surfaces unused_surfaces]
+  (struct surface_manager all_surfaces unused_surfaces))
+
 
 ;takes a gl and returns a framebuffer index
 (defn allocate_opengl_framebuffer_object [gl]

@@ -1,15 +1,70 @@
-(ns lambinator.ui)
-
-(def gl_system_lookup_strs
-     '("GL_EXTENSIONS" 
-       "GL_VENDOR"
-       "GL_RENDERER"
-       "GL_VERSION"))
-
-(def gl_todo_list (ref nil))
-
-(def gl_system_strs (ref {}))
-
-(def main_frame nil)
+(ns lambinator.ui
+  (:import (javax.media.opengl GLJPanel GLEventListener GL)
+	   (javax.swing JFrame JMenu JMenuBar JMenuItem UIManager JDialog JLabel
+			JScrollPane ScrollPaneConstants JTextField JTextPane)
+	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension)
+	   (java.awt.event ActionListener)
+	   (java.util.regex Pattern))
+  (:use lambinator.util))
 
 (load "ui_defs")
+
+;gl_win points to the actual swing jglwindow
+;gl_system_strs is a map of gl_system_lookup_str to value
+;gl_todo_list is a list of items that will happen next time 
+;the window updates 
+(defstruct ui_gl_win_data :gl_win :gl_system_strs_ref 
+	   :gl_todo_list_ref :gl_dimensions_ref
+	   :render_exceptions_ref )
+
+
+;creates all necessary ref's structs and returns a 
+;win data that contains a live glgpanel	
+;[render_exceptions_ref gl_dimensions_ref 
+; gl_system_strs_ref gl_todo_items_ref]
+(defn ui_create_gl_win_data[]
+  (let [gl_system_strs_ref (ref nil)
+	gl_todo_list_ref (ref nil)
+	gl_dimensions_ref (ref [0 0 0 0])
+	render_exceptions_ref (ref nil)
+	panel (GLJPanel.)
+	listener (create_gl_event_listener 
+		  render_exceptions_ref 
+		  gl_dimensions_ref 
+		  gl_system_strs_ref 
+		  gl_todo_list_ref)]
+    (. panel addGLEventListener listener)
+    (struct ui_gl_win_data 
+	    panel
+	    gl_system_strs_ref
+	    gl_todo_list_ref
+	    gl_dimensions_ref
+	    render_exceptions_ref)))
+
+(defstruct ui_frame_data :frame :win_data)
+
+(defn ui_create_app_frame [appName]
+  (. (System/getProperties) setProperty "apple.laf.useScreenMenuBar" "true")
+  (. (System/getProperties) setProperty "com.apple.mrj.application.apple.menu.about.name" appName)
+  (let [frame (JFrame. appName)
+	{ panel :gl_win gl_system_strs_ref :gl_system_strs_ref :as win_data } ( ui_create_gl_win_data)
+	bar (JMenuBar.)
+	menu (JMenu. "About")]
+    (.. frame getContentPane (setLayout (BorderLayout.)))
+    (.. frame getContentPane (add panel))
+    (. bar add menu)
+    (create_menu_item "OpenGL" (fn [ignored] (display_opengl_properties frame gl_system_strs_ref)) menu)
+    (. frame setJMenuBar bar)
+    (. frame show)
+    (struct ui_frame_data frame win_data)))
+
+;add a todo item and tell the view to redraw itself
+;drawable fn must take only one argument, that is the drawable
+;this function calls invalidate on the glJPanel or does something
+;to immediately schedule a render.
+;If you want your function to keep rendering, then just have it keep calling
+;this function with itself.
+(defn register_gl_drawable_todo_with_update [frame_data drawable_fn]
+  (let [{ {gl_todo_list_ref :gl_todo_list_ref panel :gl_win } :win_data } frame_data]
+    (add_gl_todo_item gl_todo_list_ref drawable_fn)
+    (. panel display)))

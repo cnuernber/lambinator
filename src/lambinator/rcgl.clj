@@ -1,26 +1,26 @@
 (ns lambinator.rcgl
-  (:use lambinator.rc lambinator.util)
-  (:import (javax.media.opengl GL)))
+  (:use lambinator.rc lambinator.util
+	lambinator.fs)
+  (:import (javax.media.opengl GL)
+	   (java.io File)))
 
-(defstruct context_texture :texture_spec :gl_handle)
-(defstruct texture_manager :textures )
-;surfaces is a vector of all the known surfaces
-;unused is a linked list of the unused surfaces
-;render size may be <= surface size
-(defstruct context_surface :surface_spec :texture_index :gl_handle :framebuffer_complete )
-
-(defstruct surface_manager :all_surfaces :unused_surfaces)
-
-(defstruct render_context :surface_manager :texture_manager)
 
 (load "rcgl_defs")
 (load "rcgl_texture")
 (load "rcgl_fbo")
+(load "rcgl_glsl")
+
+(defstruct render_context :surface_manager :texture_manager)
 
 (defn create_render_context []
   (struct render_context 
 	  (struct surface_manager [] nil)
 	  (struct texture_manager [] )))
+
+
+;most of the functions below *have* to run in the gl thread.
+;they are not threadsafe in the least.  Plus most of them take a gl interface
+;which you should never access out of the display handler.
 
 ;takes a gl, a render context, and a surface spec.
 ;returns a new render context and the index of the allocated fbo 
