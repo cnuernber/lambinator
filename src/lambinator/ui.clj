@@ -4,7 +4,8 @@
 			JScrollPane ScrollPaneConstants JTextField JTextPane)
 	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension)
 	   (java.awt.event ActionListener)
-	   (java.util.regex Pattern))
+	   (java.util.regex Pattern)
+	   (java.util.concurrent CountDownLatch)) ;forcing async to sync
   (:use lambinator.util))
 
 (load "ui_defs")
@@ -64,7 +65,30 @@
 ;to immediately schedule a render.
 ;If you want your function to keep rendering, then just have it keep calling
 ;this function with itself.
-(defn register_gl_drawable_todo_with_update [frame_data drawable_fn]
+(defn ui_register_gl_drawable_todo_with_update [frame_data drawable_fn]
   (let [{ {gl_todo_list_ref :gl_todo_list_ref panel :gl_win } :win_data } frame_data]
     (add_gl_todo_item gl_todo_list_ref drawable_fn)
     (. panel display)))
+
+;this runs a function on the render thread
+;and returns the result, blocking the caller.
+;if the result is an exception, it is wrapped and thrown
+(defn ui_run_sync_delayed_gl_function[frame_data drawable_fn]
+  (let [result_ref (ref nil)
+	error_ref (ref nil)
+	latch (CountDownLatch. 1)
+	fn_wrapper (fn [drawable]
+		     (try
+		      (let [result (drawable_fn drawable)]
+			(dosync (ref-set result_ref result)))
+		      (catch Exception e
+			(dosync (ref-set error_ref e)))
+		      (finally
+		       (. latch countDown))))]
+    (ui_register_gl_drawable_todo_with_update frame_data fn_wrapper)
+    (. latch await)
+    (let [result @result_ref
+	  error @error_ref]
+      (if error
+	(throw (Exception. error))
+	result))))
