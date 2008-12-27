@@ -10,12 +10,13 @@
 (load "rcgl_fbo")
 (load "rcgl_glsl")
 
-(defstruct render_context :surface_manager :texture_manager)
+(defstruct render_context :surface_manager :texture_manager :glsl_manager )
 
 (defn create_render_context []
   (struct render_context 
 	  (struct surface_manager [] nil)
-	  (struct texture_manager [] )))
+	  (struct texture_manager [] )
+	  (create_rcgl_glsl_manager)))
 
 
 ;most of the functions below *have* to run in the gl thread.
