@@ -38,8 +38,10 @@
 (defn add_gl_todo_item [gl_todo_list_ref item]
   (dosync (ref-set gl_todo_list_ref (conj @gl_todo_list_ref item))))
 
-(defn gl_init [drawable gl_system_strs_ref]
-  (update_gl_system_strs drawable gl_system_strs_ref))
+(defn gl_init [drawable gl_system_strs_ref render_context_ref]
+  (update_gl_system_strs drawable gl_system_strs_ref)
+  (let [new_context (rcgl_resources_destroyed drawable @render_context_ref)]
+    (dosync (ref-set render_context_ref (merge @render_context_ref new_context)))))
 
 ;Important that this gets wrapped in a try/catch
 ;if it doesn't, then you loose your ability to run the
@@ -65,10 +67,11 @@
   [render_exceptions_ref 
    gl_dimensions_ref 
    gl_system_strs_ref 
-   gl_todo_items_ref]
+   gl_todo_items_ref
+   render_context_ref]
   (proxy [Object GLEventListener]
 	  []
-	(init [dble] (gl_init dble gl_system_strs_ref))
+	(init [dble] (gl_init dble gl_system_strs_ref render_context_ref))
 
 	(display [dble] (gl_display dble gl_todo_items_ref gl_system_strs_ref))
 

@@ -7,8 +7,8 @@
 
 (defstruct texture_manager :textures )
 
-(defn create_texture_manager [textures]
-  (struct texture_manager textures))
+(defn create_texture_manager []
+  (struct texture_manager []))
 	
 ;takes a gl, a texture spec,
 ;and returns a context_texture

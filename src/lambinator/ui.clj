@@ -7,7 +7,7 @@
 	   (java.awt.event ActionListener)
 	   (java.util.regex Pattern)
 	   (java.util.concurrent CountDownLatch)) ;forcing async to sync
-  (:use lambinator.util))
+  (:use lambinator.util lambinator.rcgl))
 
 (load "ui_defs")
 
@@ -17,7 +17,7 @@
 ;the window updates 
 (defstruct ui_gl_win_data :gl_win :gl_system_strs_ref 
 	   :gl_todo_list_ref :gl_dimensions_ref
-	   :render_exceptions_ref )
+	   :render_exceptions_ref :render_context_ref )
 
 
 ;creates all necessary ref's structs and returns a 
@@ -29,19 +29,22 @@
 	gl_todo_list_ref (ref nil)
 	gl_dimensions_ref (ref [0 0 0 0])
 	render_exceptions_ref (ref nil)
+	render_context_ref (ref (create_render_context))
 	panel (GLJPanel.)
 	listener (create_gl_event_listener 
 		  render_exceptions_ref 
 		  gl_dimensions_ref 
 		  gl_system_strs_ref 
-		  gl_todo_list_ref)]
+		  gl_todo_list_ref
+		  render_context_ref)]
     (. panel addGLEventListener listener)
     (struct ui_gl_win_data 
 	    panel
 	    gl_system_strs_ref
 	    gl_todo_list_ref
 	    gl_dimensions_ref
-	    render_exceptions_ref)))
+	    render_exceptions_ref
+	    render_context_ref)))
 
 (defstruct ui_frame_data :frame :win_data)
 
@@ -93,3 +96,18 @@
       (if error
 	(throw (Exception. error))
 	result))))
+
+(defn ui_run_gl_function_with_swap_and_update[frame_data drawable_fn]
+  (let [fn_wrapper (fn [drawable]
+		     (try
+		      (drawable_fn drawable)
+		      (catch Exception e)))]
+    (ui_register_gl_drawable_todo_with_update frame_data fn_wrapper)))
+  
+(defn ui_get_rcgl_render_context_ref[frame_data]
+  (let [{ { retval :render_context_ref } :win_data } frame_data]
+    retval))
+
+(defn ui_get_render_todo_lists_ref[frame_data]
+  (let [{ { retval :gl_todo_list_ref } :win_data } frame_data]
+    retval))

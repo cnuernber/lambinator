@@ -17,8 +17,9 @@
 
 (defstruct surface_manager :all_surfaces :unused_surfaces)
 
-(defn create_surface_manager [all_surfaces unused_surfaces]
-  (struct surface_manager all_surfaces unused_surfaces))
+(defn create_surface_manager []
+  (struct surface_manager [] nil))
+
 
 
 ;takes a gl and returns a framebuffer index

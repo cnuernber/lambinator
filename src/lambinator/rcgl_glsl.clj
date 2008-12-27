@@ -257,8 +257,8 @@
 	new_programs_list (doall (mapcat
 				  (fn [[name program]] [name (update_program gl shaders program)])
 				  programs_that_matter))] ;out of the programs that matter, do the update
-    ;mix the new data into the programs list
-    (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs_list)))))
+    (when new_programs_list ;mix the new data into the programs list		
+      (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs_list))))))
 				     
 
 (defn finish_shader_load [drawable programs_ref shaders_ref bytes filename md5_hash]
@@ -320,8 +320,8 @@
 				 (update_programs gl programs_ref shaders_ref)))]
 	(dosync (ref-set render_tasks_ref (conj @render_tasks_ref prog_create_task)))) ;add the task to create the object
       (do
-	(maybe_begin_shader_load programs_ref loading_system render_tasks_ref glslv_filename vs)
-	(maybe_begin_shader_load programs_ref loading_system render_tasks_ref glslf_filename fs)))
+	(maybe_begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref glslv_filename vs)
+	(maybe_begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref glslf_filename fs)))
     (when existing_program
       (dosync (ref-set render_tasks_ref (conj @render_tasks_ref (fn [drawable]
 								  (let [gl (. drawable getGL)]
@@ -343,8 +343,10 @@
 			       (let [{ { glslv :filename } :vert_shader { glslf :filename } :frag_shader name :name } prog]
 				 [name (create_invalid_glsl_program glslv glslf name)]))
 			     @programs_ref)]
-    (dosync (ref-set shaders_ref (apply assoc @shaders_ref new_shaders)))
-    (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs)))
+    (when new_shaders
+      (dosync (ref-set shaders_ref (apply assoc @shaders_ref new_shaders))))
+    (when new_programs
+      (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs))))
     (update_programs gl programs_ref shaders_ref)))
 
 

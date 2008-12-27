@@ -78,6 +78,12 @@
     (send md5_agent 
 	  (fn [agent] (fs_thread_md5 actions_map_ref filename bytes) []))))
 
+(defn get_full_path[fname]
+  (. (File. fname) getCanonicalPath))
+
+(defn file_exists?[fname]
+  (. (File. fname) exists))
+
 ;task must take 3 arguments:
 ;byte array, filename, and md5 hash of data
 ;returns a new loading system and possibly kicked
