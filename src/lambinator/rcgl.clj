@@ -1,6 +1,6 @@
 (ns lambinator.rcgl
   (:use lambinator.rc lambinator.util
-	lambinator.fs)
+	lambinator.fs clojure.contrib.seq-utils )
   (:import (javax.media.opengl GL)
 	   (java.io File)))
 
@@ -56,6 +56,7 @@
 	unused_surfaces (old_surface_manager :unused_surfaces)
 	surface_manager (assoc old_surface_manager :unused_surfaces (conj unused_surfaces surface_index))]
     (assoc render_context :surface_manager surface_manager)))
+
 
 (defn rcgl_context_surface_size[render_context surface_index]
   (let [{ { { { { { size :size }  ;yeah, wassup with my binding forms now, beeatch
