@@ -295,12 +295,18 @@
   (when (not (glsl_shader_valid existing_shader))
     (begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref filename)))
 
-;add a new program and return the existing one if it exists.  This updates the ref
-;OK to call asynchronously
-(defn add_new_glsl_program[programs_ref glslv_filename glslf_filename prog_name]
-  (let [existing (@programs_ref prog_name)]
+;add a new program and return the existing one if it exists.  Must be called from render thread
+(defn add_new_glsl_program[gl programs_ref shaders_ref loading_system render_tasks_ref glslv_filename glslf_filename prog_name]
+  (let [existing (@programs_ref prog_name)
+	vs (@shaders_ref glslv_filename)
+	fs (@shaders_ref glslf_filename)]
+    (maybe_begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref glslv_filename vs)
+    (maybe_begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref glslf_filename fs)
     (dosync (ref-set programs_ref (assoc @programs_ref prog_name (create_invalid_glsl_program glslv_filename glslf_filename prog_name))))
-    existing ))
+    (when existing
+      (delete_glsl_program gl existing))
+    (when (and (glsl_shader_valid vs) (glsl_shader_valid fs))
+      (update_programs gl programs_ref shaders_ref))))
 
 ;from a reference to known programs
 ;filenames should be canonical
@@ -311,22 +317,11 @@
 ;I am not certain what will happen, but they will probably silently fail as the loader
 ;silently ignores files that don't exist.
 (defn create_glsl_program_from_files [programs_ref shaders_ref loading_system render_tasks_ref glslv_filename glslf_filename prog_name]
-  (let [existing_program (add_new_glsl_program programs_ref glslv_filename glslf_filename prog_name)
-	vs (@shaders_ref glslv_filename)
-	fs (@shaders_ref glslf_filename)]
-    (if (and vs fs) ;nothing is nil, we already have these shaders compiled then
-      (let [prog_create_task (fn [drawable]
-			       (let [gl (. drawable getGL)]
-				 (update_programs gl programs_ref shaders_ref)))]
-	(dosync (ref-set render_tasks_ref (conj @render_tasks_ref prog_create_task)))) ;add the task to create the object
-      (do
-	(maybe_begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref glslv_filename vs)
-	(maybe_begin_shader_load programs_ref shaders_ref loading_system render_tasks_ref glslf_filename fs)))
-    (when existing_program
-      (dosync (ref-set render_tasks_ref (conj @render_tasks_ref (fn [drawable]
-								  (let [gl (. drawable getGL)]
-								    (delete_glsl_program gl existing_program)))))))
-    nil))
+  (dosync (ref-set render_tasks_ref 
+		   (conj @render_tasks_ref 
+			 (fn [drawable]
+			   (add_new_glsl_program (. drawable getGL) programs_ref shaders_ref loading_system render_tasks_ref 
+						 glslv_filename glslf_filename prog_name))))))
 
 ;This happens if you change your window resolution or (using GLJpanel) just resize
 ;the window too far out of what it expects.

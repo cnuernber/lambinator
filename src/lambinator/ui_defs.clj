@@ -53,7 +53,7 @@
      (dosync (ref-set render_exceptions_ref (conj @render_exceptions_ref e))))))
 
 (defn gl_display [drawable gl_todo_list_ref render_exceptions_ref gl_render_fn_ref]
-  (let [todoItems @gl_todo_list_ref
+  (let [todoItems (reverse @gl_todo_list_ref)
 	render_fn @gl_render_fn_ref]
     (dosync (ref-set gl_todo_list_ref nil))
     (doseq [item todoItems]

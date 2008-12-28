@@ -7,7 +7,7 @@
 ;given a frame, load the wave glsl* files
 (defn load_wave_program [fm]
   (let [rc_ref (ui_get_rcgl_render_context_ref fm)
-	render_tasks_ref (ui_get_render_todo_lists_ref fm)]
+	render_tasks_ref (ui_get_render_todo_list_ref fm)]
     (rcgl_create_glsl_program 
      rc_ref 
      render_tasks_ref 
@@ -17,7 +17,7 @@
 
 (defn delete_wave_program [fm]
   (let [rc_ref (ui_get_rcgl_render_context_ref fm)
-	render_tasks_ref (ui_get_render_todo_lists_ref fm)]
+	render_tasks_ref (ui_get_render_todo_list_ref fm)]
     (rcgl_delete_glsl_program rc_ref render_tasks_ref "wave")))
   
 

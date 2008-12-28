@@ -9,6 +9,7 @@
 (load "rcgl_texture")
 (load "rcgl_fbo")
 (load "rcgl_glsl")
+(load "rcgl_vbo")
 
 (defstruct render_context :surface_manager :texture_manager :glsl_manager :loading_system )
 

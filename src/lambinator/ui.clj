@@ -128,6 +128,10 @@
   (let [{ { retval :render_context_ref } :win_data } frame_data]
     retval))
 
+(defn ui_get_render_todo_list_ref [frame_data]
+  (let [{ { retval :gl_todo_list_ref } :win_data } frame_data]
+    retval))
+
 (defn animator_render_update [drawable ui_animator]
   (let [default_render_fn_ref (ui_animator :default_render_fn_ref)
 	render_fn_ref (ui_animator :render_fn_ref)

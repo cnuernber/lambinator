@@ -1,5 +1,6 @@
 (ns lambinator.util
-  (:import (java.lang.reflect Modifier)))
+  (:import (java.lang.reflect Modifier)
+	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)))
 
 (defn find_static_fields_by_value [cls_name val]
   (let [cls (Class/forName cls_name)
@@ -35,3 +36,30 @@
 (defn current_thread_id[]
   (let [thread (Thread/currentThread)]
     (. thread getId)))
+
+(defn create_buffer_of_type[data_seq datatype buffer_object_fn]
+  (let [data_array (into-array datatype data_seq)
+	buffer_object (buffer_object_fn (count data_array))]
+    (. buffer_object put data_array)
+    buffer_object))
+
+(defmulti make_nio_buffer_data (fn [data_seq first_data_item] (class first_data_item)))
+(defmethod make_nio_buffer_data Byte [data_seq first_data_item]
+  (create_buffer_of_type data_seq Byte/TYPE #(ByteBuffer/allocate %)))
+(defmethod make_nio_buffer_data Short [data_seq first_data_item]
+  (create_buffer_of_type data_seq Short/TYPE #(ShortBuffer/allocate %)))
+(defmethod make_nio_buffer_data Integer [data_seq first_data_item]
+  (create_buffer_of_type data_seq Integer/TYPE #(IntBuffer/allocate %)))
+(defmethod make_nio_buffer_data Float [data_seq first_data_item]
+  (create_buffer_of_type data_seq Float/TYPE #(FloatBuffer/allocate %)))
+(defmethod make_nio_buffer_data :default [&args]
+  nil)
+
+
+;returns null if seq doesn't contain any data
+(defn make_nio_buffer[data_seq]
+  (let [first_item (first data_seq)]
+    (if first_item
+      (make_nio_buffer_data data_seq first_item)
+      nil)))
+  
