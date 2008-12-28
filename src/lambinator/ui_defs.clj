@@ -52,11 +52,17 @@
    (catch Exception e
      (dosync (ref-set render_exceptions_ref (conj @render_exceptions_ref e))))))
 
-(defn gl_display [drawable gl_todo_list_ref render_exceptions_ref]
-  (let [todoItems @gl_todo_list_ref]
+(defn gl_display [drawable gl_todo_list_ref render_exceptions_ref gl_render_fn_ref]
+  (let [todoItems @gl_todo_list_ref
+	render_fn @gl_render_fn_ref]
     (dosync (ref-set gl_todo_list_ref nil))
     (doseq [item todoItems]
-      (run_gl_todo_item drawable item render_exceptions_ref) todoItems)))
+      (run_gl_todo_item drawable item render_exceptions_ref))
+    (if render_fn
+      (run_gl_todo_item drawable render_fn render_exceptions_ref)
+      (let [gl (. drawable getGL)]
+	(. gl glClearColor 0.05 0.05 0.1 1.0)
+	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))))
 
 (defn gl_display_changed [drawable modelChanged devChanged])
 
@@ -68,12 +74,13 @@
    gl_dimensions_ref 
    gl_system_strs_ref 
    gl_todo_items_ref
-   render_context_ref]
+   render_context_ref
+   gl_render_fn_ref]
   (proxy [Object GLEventListener]
 	  []
 	(init [dble] (gl_init dble gl_system_strs_ref render_context_ref))
 
-	(display [dble] (gl_display dble gl_todo_items_ref gl_system_strs_ref))
+	(display [dble] (gl_display dble gl_todo_items_ref render_exceptions_ref gl_render_fn_ref))
 
 	(displayChanged [dble modeChanged devChanged]
 			(gl_display_changed dble modeChanged devChanged ))

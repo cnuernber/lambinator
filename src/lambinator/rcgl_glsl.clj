@@ -349,6 +349,46 @@
       (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs))))
     (update_programs gl programs_ref shaders_ref)))
 
+(defn glsl_shader_in_use[programs_ref filename]
+  (let [using_progs (filter (fn[[name program]]
+				(or (= ((program :vert_shader) :filename) filename)
+				    (= ((program :frag_shader) :filename) filename)))
+			    @programs_ref)]
+    (not (= (first using_progs) nil)))) ;;if there is at least one program using this.
+
+(defn remove_and_return_item[map_ref key]
+  (dosync
+   (let [item (@map_ref key)]
+     (dosync (ref-set map_ref (dissoc @map_ref key)))
+     item )))
+
+(defn remove_shader_if_not_in_use[programs_ref shaders_ref filename]
+  (dosync
+   (let [shader (@shaders_ref filename)]
+     (if (and shader 
+	      (not (glsl_shader_in_use programs_ref filename)))
+       (do
+	 (dosync (ref-set shaders_ref (dissoc @shaders_ref filename)))
+	 shader)
+       nil ))))
+
+(defn check_delete_glsl_shader[drawable programs_ref shaders_ref filename]
+  (let [shader (remove_shader_if_not_in_use programs_ref shaders_ref filename)]
+    (when shader
+      (delete_glsl_shader (. drawable getGL) shader))))
+    
+
+(defn delete_rcgl_glsl_program_and_shaders[drawable programs_ref shaders_ref prog_name]
+  (let [program (remove_and_return_item programs_ref prog_name)]
+    (when program
+      (let [gl (. drawable getGL)
+	    glslv ((program :vert_shader) :filename)
+	    glslf ((program :frag_shader) :filename)]
+	(delete_glsl_program gl program)
+	(check_delete_glsl_shader drawable programs_ref shaders_ref glslv)
+	(check_delete_glsl_shader drawable programs_ref shaders_ref glslf)))))
+	    
+
 
 (defstruct rcgl_glsl_manager :programs_ref :shaders_ref)
 (defn create_rcgl_glsl_manager [] 

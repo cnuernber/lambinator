@@ -103,3 +103,9 @@
 	(create_glsl_program_from_files programs_ref shaders_ref loading_system render_tasks_ref glslv glslf prog_name )
 	true)
       false)))
+
+(defn rcgl_delete_glsl_program[render_context_ref render_tasks_ref prog_name]
+  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager } @render_context_ref]
+    (dosync (ref-set render_tasks_ref 
+		     (conj @render_tasks_ref 
+			   #(delete_rcgl_glsl_program_and_shaders % programs_ref shaders_ref prog_name))))))

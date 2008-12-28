@@ -15,6 +15,12 @@
      "../data/glsl/wave.glslf"
      "wave")))
 
+(defn delete_wave_program [fm]
+  (let [rc_ref (ui_get_rcgl_render_context_ref fm)
+	render_tasks_ref (ui_get_render_todo_lists_ref fm)]
+    (rcgl_delete_glsl_program rc_ref render_tasks_ref "wave")))
+  
+
 ;runs one display loop of the wave demo.
 ;for a good time, remove the type inferencing support and see how long it takes...
 ;You could make this a *lot* faster by switching the vertex shader to use
@@ -66,12 +72,24 @@
     (when wave_proggy
       (do_display_wave_demo drawable wave_proggy wave_time wave_width wave_height))))
 
-;You can run whatever opengl commands you want to run using the ui_run_sync_delayed_gl_function
-;The function gets passed a drawable (jogl glAutoDrawable I think)
-(defn run_display_wave_demo[fm wave_time wave_width wave_height]
-  (let [rc_ctx_ref (ui_get_rcgl_render_context_ref fm)
-	gl_fn #(display_wave_demo % rc_ctx_ref wave_time wave_width wave_height)]
-    (ui_run_sync_delayed_gl_function fm gl_fn)))
+(def wave_frequency_ref (ref 1.0))
+(defn set_wave_frequency [val] (dosync (ref-set wave_frequency_ref val)))
+
+(def wave_width_ref (ref 0.1))
+(defn set_wave_width [val] (dosync (ref-set wave_width_ref val)))
+
+(def wave_height_ref (ref 3.0))
+(defn set_wave_height [val] (dosync (ref-set wave_height_ref val)))
+
+(defn display_animating_wave_demo [drawable render_context_ref start_milliseconds]
+  (let [current (System/currentTimeMillis)
+	wave_frequency @wave_frequency_ref
+	relative (- current start_milliseconds)
+	relative_seconds (/ relative 1000)
+	rel_seq_freq (* relative_seconds wave_frequency)
+	wave_time (rem rel_seq_freq Math/PI)]
+    (display_wave_demo drawable render_context_ref wave_time @wave_width_ref @wave_height_ref)))
+  
 
 (def fm (ui_create_app_frame "wave_demo"))
 ;the resize has to come before the call to load the glsl program.
@@ -79,18 +97,25 @@
 ;thus invalidating all of your gl handles on resize.  Handling
 ;this gracefully is an ongoing task.
 (. (fm :frame) setSize 400 300) 
-(load_wave_program fm)
-(run_display_wave_demo fm  0.0 0.1 3.0)
-;;OK, that was cool.  Now check out:
-(defn run_display_wave_demo_a_lot []
-  (let [rc_ctx_ref (ui_get_rcgl_render_context_ref fm)]
-    (doseq [wave_time (range (float 0.0) (float 50.0) (float 0.1))]
-      (ui_run_gl_function_with_swap_and_update 
-       fm
-       #(display_wave_demo % rc_ctx_ref wave_time (float 0.1) (float 3.0))))))
 
-;If you resize the frame too much, you will need to re-create the shader program
-;Also, be sure to check out your opengl extensions by looking at the about
-;menu.
-(println "(run_display_wave_demo_a_lot) ;do this")
+(defn enable_animating_wave_demo []
+  (load_wave_program fm)
+  (let [current_millis (System/currentTimeMillis)
+	rc_ref (ui_get_rcgl_render_context_ref fm)]
+    (ui_set_gl_render_fn fm #(display_animating_wave_demo % rc_ref current_millis))
+    (ui_set_fps_animator fm 60))
+  nil)
 
+(defn disable_animating_wave_demo []
+  (ui_set_gl_render_fn fm nil)
+  (delete_wave_program fm)
+  (ui_disable_fps_animator fm)
+  nil)
+
+(println "(enable_animating_wave_demo)")
+(println "(set_wave_frequency 5)")
+(println "(set_wave_width 0.2)")
+(println "(set_wave_height 5.0)")
+(println "(disable_animating_wave_demo)")
+
+(enable_animating_wave_demo)
