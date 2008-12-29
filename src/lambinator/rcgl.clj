@@ -11,14 +11,20 @@
 (load "rcgl_glsl")
 (load "rcgl_vbo")
 
-(defstruct render_context :surface_manager :texture_manager :glsl_manager :loading_system )
+(defstruct render_context 
+  :surface_manager 
+  :texture_manager 
+  :glsl_manager 
+  :loading_system
+  :vbo_manager )
 
 (defn create_render_context []
   (struct render_context 
 	  (create_surface_manager)
 	  (create_texture_manager)
 	  (create_rcgl_glsl_manager)
-	  (create_loading_system)))
+	  (create_loading_system)
+	  (create_vbo_manager)))
 
 
 ;most of the functions below *have* to run in the gl thread.
@@ -83,8 +89,10 @@
 ;The ones that can be regenerated will be.
 ;returns a new render context
 (defn rcgl_resources_destroyed[drawable render_context]
-  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager } render_context]
+  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager 
+	  { vbos_ref :vbos_ref } :vbo_manager } render_context]
     (resources_released_reload_all_glsl_programs drawable programs_ref shaders_ref)
+    (vbo_resources_destroyed (. drawable getGL) vbos_ref)
     (assoc render_context :surface_mananger (create_surface_manager) :texture_manager (create_texture_manager))))
     
 
@@ -105,8 +113,34 @@
 	true)
       false)))
 
+(defn append_to_ref_list [render_tasks_ref lmbda]
+  (dosync (ref-set render_tasks_ref (conj @render_tasks_ref lmbda))))
+
 (defn rcgl_delete_glsl_program[render_context_ref render_tasks_ref prog_name]
   (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager } @render_context_ref]
-    (dosync (ref-set render_tasks_ref 
-		     (conj @render_tasks_ref 
-			   #(delete_rcgl_glsl_program_and_shaders % programs_ref shaders_ref prog_name))))))
+    (append_to_ref_list render_tasks_ref #(delete_rcgl_glsl_program_and_shaders % programs_ref shaders_ref prog_name))))
+
+;vbo type must be either :data or :index
+;generator is a function that returns a sequence of numbers.  If they are float
+;then you get a float buffer.  If they are bytes, then you get a byte buffer.
+;Finally, if they are short, then you get a short buffer.  So pay attention
+;when you are creating the sequence.
+(defn rcgl_create_vbo [render_context_ref render_tasks_ref buf_name vbo_type generator]
+  (let [{ { vbos_ref :vbos_ref } :vbo_manager } @render_context_ref]
+    (append_to_ref_list render_tasks_ref #(create_vbo (. % getGL) vbos_ref buf_name vbo_type generator))))
+
+(defn rcgl_delete_vbo [render_context_ref render_tasks_ref buf_name]
+  (let [{ { vbos_ref :vbos_ref } :vbo_manager } @render_context_ref]
+    (append_to_ref_list render_tasks_ref #(delete_vbo (. % getGL) vbos_ref buf_name ))))
+
+(defn rcgl_delete_vbo [render_context_ref render_tasks_ref buf_name]
+  (let [{ { vbos_ref :vbos_ref } :vbo_manager } @render_context_ref]
+    (append_to_ref_list render_tasks_ref #(delete_vbo (. % getGL) vbos_ref buf_name ))))
+
+(defn rcgl_get_vbo [render_context name]
+  (let [{ { vbos_ref :vbos_ref } :vbo_manager } render_context
+	retval (@vbos_ref name)]
+    (if (gl_vbo_valid retval)
+      retval
+      nil)))
+    

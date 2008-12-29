@@ -145,19 +145,24 @@
 	  (. gl glClearColor 0.2 0.2 1.0 1.0)
 	  (. gl glClear GL/GL_COLOR_BUFFER_BIT))))))
 
-(defn ui_set_fps_animator[frame_data inFPS]
-  (let [{ { drawable :gl_win animator_ref :animator_ref } :win_data } frame_data
-	animator (FPSAnimator. drawable inFPS true)
-	old_animator @animator_ref]
-    (when old_animator 
-      (. old_animator stop))
-    (. animator start)
-    (dosync (ref-set animator_ref animator))))
-
 (defn ui_disable_fps_animator[frame_data]
   (let [{ { animator_ref :animator_ref :as win_data } :win_data } frame_data
 	old_animator @animator_ref]
     (when old_animator
       (. old_animator stop))
     (dosync (ref-set animator_ref nil))))
+
+(defn ui_set_fps_animator[frame_data inFPS]
+  (let [{ { drawable :gl_win animator_ref :animator_ref } :win_data } frame_data
+	animator (FPSAnimator. drawable inFPS true)
+	old_animator @animator_ref]
+    (ui_disable_fps_animator frame_data)
+    (. animator start)
+    (dosync (ref-set animator_ref animator))))
+
+(defn ui_update_display [frame_data]
+  (let [{ { panel :gl_win } :win_data } frame_data
+	dims (. panel getSize)]
+    (. panel repaint 0 0 (.width dims) (.height dims))))
+  
     

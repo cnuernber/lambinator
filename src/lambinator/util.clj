@@ -41,6 +41,9 @@
   (let [data_array (into-array datatype data_seq)
 	buffer_object (buffer_object_fn (count data_array))]
     (. buffer_object put data_array)
+    ;set position back to 0, ready for channel read
+    ;this was a difficult one to figure out.
+    (. buffer_object flip)
     buffer_object))
 
 (defmulti make_nio_buffer_data (fn [data_seq first_data_item] (class first_data_item)))
