@@ -41,7 +41,6 @@
       <arg value="lambinator.rc"/>
       <arg value="lambinator.rcgl"/>
       <arg value="lambinator.util"/>
-      <arg value="lambinator.test"/>
       <arg value="lambinator.mockgl"/>
       <arg value="lambinator.fs"/>
     </java>

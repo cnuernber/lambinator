@@ -1,4 +1,5 @@
-(ns lambinator.rc)
+(ns lambinator.rc
+  (:use clojure.contrib.except lambinator.util))
 ;Render commands are pure data interfaces
 ;that contain the commands necessary to render
 ;a scene or some chunk of a scene.
@@ -35,17 +36,14 @@
 ;surface is a 2D slice that we can render to and bind as a texture
 ;Colors- floating point, 0.0-1.0 (greater than 1.0 is allowed for some
 ;operations)
-(def texture_formats [:rgba :rgb :alpha :lum :lum_alpha])
-(def texture_datatypes [:ubyte :ushort :float :half_float] ) ;values used for
-(def surface_depth_types [:16 :24 :32 :none] ) ;values used for depth_bits
+(def rc_formats [:rgba :rgb :alpha :lum :lum_alpha])
+(def rc_datatypes [:ubyte :ushort :float :half_float] ) ;values used for
 (defstruct texture_spec :datatype :format :size)
 (defstruct mipmapped_texture_spec :texture :mipmap_count)
 ;cube maps can have mipmapped textures specified as their
 ;textures.  I have never really tried this.
 (defstruct cubemap_spec :top :bottom :left :right :front :back)
 (defstruct color :r :g :b :a)
-;A surface is usually going to be an FBO object
-(defstruct surface_spec :depth_bits :stencil :texture_spec )
 
 
 ;Now we start with render command definitions
@@ -60,13 +58,6 @@
       :allocate_surface_render_command 
       :release_surface_render_command])
 (defstruct scene_render_command :render_command_type :surface_spec :clear_color )
-;you can request a surface that is larger or smaller
-;than the world you intend to render to.  This results
-;in scaling the result up or down.  I wouldn't request
-;a size that has a different aspect ratio at this moment.
-(defstruct allocate_surface_render_command :render_command_type :relative_index 
-	   :surface_spec :render_size :clear_color )
-(defstruct release_surface_render_command :render_command_type :relative_index)
 
 (defn create_texture_spec [format type width height]
   (struct texture_spec type format [width height]))
@@ -76,12 +67,6 @@
 
 (defn create_color [r g b a]
   (struct color r g b a))
-
-(defn create_surface_spec [depth_bits stencil texture_spec]
-  (struct surface_spec depth_bits stencil texture_spec))
-
-(defn create_scene_render_command [surface_spec clear_color]
-  (struct scene_render_command :scene_render_command surface_spec clear_color))
 
 
 ;do details; type and format match
@@ -94,19 +79,17 @@
 ;ignoring width and height, could you substitute
 ;surface1 for surface2
 (defn surface_details_match [surface1 surface2]
-  (and (texture_details_match (surface1 :texture_spec)
-			      (surface2 :texture_spec))
-       (= (surface1 :depth_bits)
-	   (surface2 :depth_bits))
-       (= (surface1 :stencil)
-	   (surface2 :stencil))))
+  (and (= (surface1 :attachments)
+	  (surface2 :attachments))
+       (= (surface1 :num_samples)
+	  (surface2 :num_samples))))
 
 ;how many bytes would you have to allocate to
 ;fit desired in surface
 ;Assume you aren't going to shrink a surface
 (defn bytes_required [surface desired]
-  (let [[sw sh] ((surface :texture_spec) :size)
-	[dw dh] ((desired :texture_spec) :size)
+  (let [[sw sh] ( surface :size)
+	[dw dh] (desired :size)
 	max (fn [s d] (if (> d s) d s))]
     (if (and (>= sw dw)
 	     (>= sh dh))
@@ -114,6 +97,69 @@
       (- (* (max sw dw) (max sh dh)) (* sh sw)))))
 
 (defn overdraw [surface desired]
-  (let [[sw sh] ((surface :texture_spec) :size)
-	[dw dh] ((desired :texture_spec) :size)]
+  (let [[sw sh] (surface :size)
+	[dw dh] (desired :size)]
     (- (* sw sh) (* dw dh))))
+
+
+(def renderbuffer_types [:color :depth])
+(defstruct renderbuffer_data 
+  :type ;the type, one of the above render buffer types
+  :depth_bits ;number of bits; used only for depth buffers
+  :color_datatype ;the color datatype, ubyte ushort half_float float
+  :color_format ;format rbga rbg lum lum_alpha
+  :use_texture) ;true if you want this renderbuffer to render to a texture.
+(defmulti create_renderbuffer (fn [type & args] type))
+
+(def surface_depth_bits [:16 :24 :32] ) ;values used for depth_bits
+
+;create a depth renderbuffer specifying the bits from the above array
+;and whether to use a texture
+(defmethod create_renderbuffer :depth [type depth_bits use_texture] 
+  (throw_if_item_missing depth_bits surface_depth_bits "depth_bits must be a surface_depth_bits: " depth_bits)
+  (struct-map renderbuffer_data :type type :depth_bits depth_bits :use_texture use_texture))
+
+;Create a color renderbuffer 
+(defmethod create_renderbuffer :color [type datatype format use_texture]
+  (throw_if_item_missing datatype rc_datatypes "datatype must be an rc datatype: " datatype)
+  (throw_if_item_missing format rc_formats "format must be an rc format: " format)
+  (struct-map renderbuffer_data 
+    :type type ;color
+    :color_datatype datatype ;datatype of the color buffer
+    :color_format format     ;format of the color buffer
+    :use_texture use_texture)) ;true if you want a texture from this buffer.
+
+
+(def surface_attachment_points [:color0 :color1 :color2 :color3 :depthl])
+(def multisample_num_samples [:2 :4 :8 :16])
+;a surface can have several attachments.  It *has* to have color0, but other than that
+;it is up to you; if you want to have multiple render target support then you need to create
+;FBOs that support this by filling in color0-colorn for each render target you want.
+;If you specify a multisample buffer as one of the attachments, then you can't use
+;texture attachments.  Thus a multi sample fbo setup is pretty particular and I considered
+;making it a special surface type, but I figure it is better to just let users sort
+;it all out ;).
+(defstruct surface_spec :attachments :size :multi_sample)
+(defn create_surface_spec 
+  ([attachments width height multi_sample] 
+     (when multi_sample
+       (throw_if_item_missing multi_sample 
+			      multisample_num_samples 
+			      "datatype must be multisample_num_samples: " multi_sample))
+     (struct-map surface_spec 
+       :attachments attachments
+       :size [width height]
+       :multi_sample multi_sample))
+  ([attachments width height] (create_surface_spec attachments width height nil)))
+
+;There are certain combinations that don't make any sense.
+;like attaching a depth renderbuffer to a color attachment point.
+;or attaching a multisample buffer to the depth attachment point.
+;so just don't do it.
+;returns a new sspec
+(defn attach_renderbuffer [sspec attach_pt buffer]
+  (assoc sspec :attachments 
+	 (assoc (sspec :attachments) attach_pt buffer)))
+
+(defn has_multi_sample[sspec]
+  (not (nil? (sspec :multi_sample))))

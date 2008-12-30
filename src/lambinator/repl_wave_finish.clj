@@ -10,7 +10,14 @@
 (defonce fm nil)
 
 (defn create_ui[]
-  (def fm (ui_create_app_frame "wave_demo"))
+  (let [capabilities (GLCapabilities. )]
+    (doto capabilities
+      (.setRedBits 8)
+      (.setGreenBits 8)
+      (.setBlueBits 8)
+      (.setDepthBits 24)
+      (.setDoubleBuffered false)
+    (def fm (ui_create_app_frame "wave_demo" capabilities)))
 ;the resize has to come before the call to load the glsl program.
 ;this is because sometimes the jpanel jettisons the gl context
 ;thus invalidating all of your gl handles on resize.  Handling

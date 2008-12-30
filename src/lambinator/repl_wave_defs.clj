@@ -2,7 +2,7 @@
 (use 'lambinator.rcgl)
 (use 'clojure.contrib.seq-utils)
 (import '(java.io File))
-(import '(javax.media.opengl GL DebugGL))
+(import '(javax.media.opengl GL DebugGL GLCapabilities))
 (import '(javax.media.opengl.glu GLU))
 
 ;given a frame, load the wave glsl* files

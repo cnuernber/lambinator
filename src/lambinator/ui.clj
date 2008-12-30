@@ -1,5 +1,5 @@
 (ns lambinator.ui
-  (:import (javax.media.opengl GLJPanel GLEventListener GL)
+  (:import (javax.media.opengl GLJPanel GLEventListener GL GLCapabilities)
 	   (javax.swing JFrame JMenu JMenuBar JMenuItem UIManager JDialog JLabel
 			JScrollPane ScrollPaneConstants JTextField JTextPane)
 	   (javax.swing.text.html HTMLEditorKit)
@@ -30,10 +30,11 @@
 	   )
 
 ;creates all necessary ref's structs and returns a 
+;you pass in a javax.media.opengl.GLCapabilities
 ;win data that contains a live glgpanel	
 ;[render_exceptions_ref gl_dimensions_ref 
 ; gl_system_strs_ref gl_todo_items_ref]
-(defn ui_create_gl_win_data[]
+(defn ui_create_gl_win_data[glcapabilities]
   (let [gl_system_strs_ref (ref nil)
 	;this list gets run once then cleared
 	gl_todo_list_ref (ref nil)
@@ -41,7 +42,7 @@
 	render_exceptions_ref (ref nil)
 	render_context_ref (ref (create_render_context))
 	gl_render_fn_ref (ref nil)
-	panel (GLJPanel.)
+	panel (GLJPanel. glcapabilities)
 	listener (create_gl_event_listener 
 		  render_exceptions_ref 
 		  gl_dimensions_ref 
@@ -62,11 +63,11 @@
 
 (defstruct ui_frame_data :frame :win_data)
 
-(defn ui_create_app_frame [appName]
+(defn ui_create_app_frame [appName capabilities]
   (. (System/getProperties) setProperty "apple.laf.useScreenMenuBar" "true")
   (. (System/getProperties) setProperty "com.apple.mrj.application.apple.menu.about.name" appName)
   (let [frame (JFrame. appName)
-	{ panel :gl_win gl_system_strs_ref :gl_system_strs_ref :as win_data } ( ui_create_gl_win_data)
+	{ panel :gl_win gl_system_strs_ref :gl_system_strs_ref :as win_data } ( ui_create_gl_win_data capabilities)
 	bar (JMenuBar.)
 	menu (JMenu. "About")]
     (.. frame getContentPane (setLayout (BorderLayout.)))

@@ -1,6 +1,7 @@
 (ns lambinator.util
   (:import (java.lang.reflect Modifier)
-	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)))
+	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer))
+  (:use clojure.contrib.except))
 
 (defn find_static_fields_by_value [cls_name val]
   (let [cls (Class/forName cls_name)
@@ -65,4 +66,13 @@
     (if first_item
       (make_nio_buffer_data data_seq first_item)
       nil)))
-  
+
+(defn stringify [& args]
+  (if args
+    (with-out-str
+     (apply print args))
+    ""))
+
+(defn throw_if_item_missing [item coll & args]
+  (when (not (some (partial = item) coll))
+    (throwf (stringify args))))

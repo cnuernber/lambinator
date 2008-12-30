@@ -3,24 +3,24 @@
 ;surfaces is a vector of all the known surfaces
 ;unused is a linked list of the unused surfaces
 ;render size may be <= surface size
-(defstruct context_surface :surface_spec :texture_index :gl_handle :framebuffer_complete )
+(defstruct context_renderbuffer :gl_handle :texture_gl_handle)
+(defstruct context_surface :gl_handle :surface_spec :attachments :framebuffer_status )
 
-(defn create_context_surface 
-  ( [surface_spec texture_index gl_handle complete]
-      (struct context_surface 
-	      surface_spec 
-	      texture_index 
-	      gl_handle
-	      complete))
-  ( [surface_spec texture_index gl_handle]
-      (create_context_surface surface_spec texture_index gl_handle "unknown")))
+(defn context_renderbuffer_valid [rb]
+  (and rb
+       (> (rb :gl_handle) 0)))
 
-(defstruct surface_manager :all_surfaces :unused_surfaces)
+(defn context_renderbuffer_texture_valid[rb]
+  (and (context_renderbuffer_valid rb)
+       (> (rb :texture_gl_handle) 0)))
 
-(defn create_surface_manager []
-  (struct surface_manager [] nil))
+(defn context_surface_valid[surface]
+  (and surface
+       (> (surface :gl_handle) 0)))
 
-
+(defn context_surface_valid_for_render[surface]
+  (and (context_surface_valid surface)
+       (== (surface :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)))
 
 ;takes a gl and returns a framebuffer index
 (defn allocate_opengl_framebuffer_object [gl]
@@ -37,197 +37,142 @@
 (defn release_opengl_framebffer_renderbuffer [gl rb_hdl]
   (release_gl_item (fn [count args offset] (. gl glDeleteRenderbuffersEXT count args offset)) rb_hdl))
 
+(defmulti gl_attachment_point_from_rc_attachment_point identity)
+(defmethod gl_attachment_point_from_rc_attachment_point :color0 [_] GL/GL_COLOR_ATTACHMENT0_EXT)
+(defmethod gl_attachment_point_from_rc_attachment_point :color1 [_] GL/GL_COLOR_ATTACHMENT1_EXT)
+(defmethod gl_attachment_point_from_rc_attachment_point :color2 [_] GL/GL_COLOR_ATTACHMENT2_EXT)
+(defmethod gl_attachment_point_from_rc_attachment_point :color3 [_] GL/GL_COLOR_ATTACHMENT3_EXT)
+(defmethod gl_attachment_point_from_rc_attachment_point :depth [_] GL/GL_DEPTH_ATTACHMENT_EXT)
 
+(defn create_and_bind_renderbuffer [gl internal_format width height attach_pt]
+  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
+	gl_attach_pt (gl_attachment_point_from_rc_attachment_point attach_pt)]
+    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
+    (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal_format width height)
+    (. gl glFramebufferRenderbufferEXT 
+       GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
+    (struct context_renderbuffer rb_handle 0)))
 
-;this is complex.  You want to return the smallest
-;surface where both width,height are >= desired
-;If you can't get that, you want the one that will
-;require the fewest more bytes allocated on the
-;card.
-;Takes a vector of surfaces, an index of first surface to compare
-;an index of the second surface to compare,
-;and the desired texture_spec
-;This assumes that you have already filtered the possibilities by
-;the ones that have matching specification such as format and texture_type
-(defn context_surface_matches_better [all_surfaces ctx_surface_idx1 ctx_surface_idx2 desired]
-  ;ensure valid surfaces are passed in
-  (if (== -1 ctx_surface_idx1)
-    ctx_surface_idx2
-    (if (== -1 ctx_surface_idx2)
-      ctx_surface_idx1
-      (let [surface1 (sspec_from_context_surface_index all_surfaces ctx_surface_idx1)
-	    surface2 (sspec_from_context_surface_index all_surfaces ctx_surface_idx2)
-	    required1 (bytes_required surface1 desired)
-	    required2 (bytes_required surface2 desired)]
-	(if (and (== required1 0)
-		 (== required2 0)) ;desired would fit in either 1 or 2
-	  (if (<= (overdraw surface1 desired)
-		  (overdraw surface2 desired)) ;return the one with the least overdraw
-	    ctx_surface_idx1
-	    ctx_surface_idx2)
-	  (if (== required1 0) ;desired would fit in s1
-	    ctx_surface_idx1
-	    (if (== required2 0) ;desired would fit in s2
-	      ctx_surface_idx2
-	      (if (<= required1 required2) ;return the least number of types required
-		ctx_surface_idx1
-		ctx_surface_idx2))))))))
-
-(defn filter_possible_context_surfaces [all_surfaces unused_surfaces surface_spec]
-  (filter 
-   (fn [idx]
-     (let [ctx_src (all_surfaces idx)
-	   ctx_spec (ctx_src :surface_spec)]
-       (and (surface_details_match ctx_spec surface_spec)
-	    (> (ctx_src :gl_handle) 0))))
-   unused_surfaces))
-
-(defn find_best_context_surface [all_surfaces unused_surfaces surface_spec]
-  (let [possible_unused (filter_possible_context_surfaces 
-			 all_surfaces unused_surfaces surface_spec)]
-    (reduce (fn [best_so_far idx ]
-	      (context_surface_matches_better all_surfaces best_so_far 
-					      idx surface_spec))
-	    -1 
-	    possible_unused )))
-
-;return the index of the unused handle a new all_surfaces list
-(defn find_empty_context_surface[all_surfaces]
-  (util_find_next_matching_index all_surfaces 
-				 #(== 0 (% :gl_handle)) (fn [] nil)))
-
-
-;allocate an FBO but don't allocate the texture; resize it if necessary
-(defn internal_allocate_opengl_framebuffer_object [gl texture_index tex_handle, surface_spec]
-  (let [texture_spec (surface_spec :texture_spec)
-	fbo_handle (allocate_opengl_framebuffer_object gl)
-	internal_format (gl_internal_format_from_texture_spec texture_spec)
-	external_format (gl_external_format_from_texture_spec texture_spec)
-	external_datatype (gl_external_datatype_from_texture_spec texture_spec) 
-	[width height] (texture_spec :size)
-	depth_bits (surface_spec :depth_bits)]
-    ;game on
-    (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo_handle)
+(defn create_and_bind_textured_renderbuffer[gl internal_format width height external_format external_datatype attach_pt binding_func]
+  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
+	tex_handle (allocate_opengl_texture_handle gl)]
+    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
     (. gl glBindTexture GL/GL_TEXTURE_2D tex_handle)
-    ;allocate space on the card...
+    (when binding_func
+      (binding_func))
     (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal_format width height 0 external_format external_datatype nil)
     (. gl glFramebufferTexture2DEXT 
-       GL/GL_FRAMEBUFFER_EXT GL/GL_COLOR_ATTACHMENT0_EXT GL/GL_TEXTURE_2D 
+       GL/GL_FRAMEBUFFER_EXT 
+       (gl_attachment_point_from_rc_attachment_point attach_pt) GL/GL_TEXTURE_2D 
        tex_handle 0)
-    (when (not (= :none depth_bits))
-      (let [depth_constant (convert_depth_bits_to_gl_constant depth_bits)
-	    depth_buffer (allocate_opengl_framebuffer_renderbuffer gl)]
-	(. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT depth_buffer)
-	(. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT depth_constant width height)
-	(. gl glFramebufferRenderbufferEXT 
-	   GL/GL_FRAMEBUFFER_EXT GL/GL_DEPTH_ATTACHMENT_EXT GL/GL_RENDERBUFFER_EXT depth_buffer)))
-    (let [bufComplete (. gl glCheckFramebufferStatusEXT GL/GL_FRAMEBUFFER_EXT)
-	  bufCompleteName (get_opengl_constant_name bufComplete)]
-    ;omitting status check for now until I figure some sequence of formats I can
-    ;run through
-      (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)
-      (create_context_surface surface_spec texture_index fbo_handle bufCompleteName))))
+    (struct context_renderbuffer rb_handle tex_handle)))	
 
-;Releases opengl resources related to the context surface
-;sets gl handle to an invalid value.
-(defn internal_release_context_surface [gl context_surface]
-  (let [old_handle (context_surface :gl_handle)
-	invalid_gl_handle (release_opengl_framebuffer_object gl old_handle)]
-    (assoc context_surface :gl_handle invalid_gl_handle)))
+(defmulti create_context_rb (fn [gl attach_pt renderbuffer width height] [(renderbuffer :type) (renderbuffer :use_texture)]))
+(defmethod create_context_rb [:color false] [gl attach_pt renderbuffer width height]
+  (let [rc_format (renderbuffer :color_format)
+	rc_dtype (renderbuffer :color_datatype)
+	internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)]
+    (create_and_bind_renderbuffer gl internal_format width height attach_pt)))
 
-;release the context surface.
-;returns the new list of all surfaces and the new textures list
-(defn release_context_surface[gl index all_surfaces textures]
-  (let [context_surface (all_surfaces index)
-	old_texture_index (context_surface :texture_index)
-	new_textures (release_context_texture_item gl textures old_texture_index)
-	new_surface (internal_release_context_surface gl context_surface)]
-    [(assoc all_surfaces index new_surface) textures]))
+(defmethod create_context_rb [:color true] [gl attach_pt renderbuffer width height]
+  (let [rc_format (renderbuffer :color_format)
+	rc_dtype (renderbuffer :color_datatype)]
+    (let [internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)
+	  external_format (gl_external_format_from_texture_format rc_format)
+	  external_datatype (gl_external_datatype_from_texture_datatype rc_dtype)]
+      (create_and_bind_textured_renderbuffer gl internal_format width height external_format external_datatype attach_pt nil))))
 
- 
-;returns a new context_surface and a new context_textures_list
-;as it updates the context texture to reflect the new width and height
-;[context_surface context_textures_list]
-(defn reallocate_opengl_framebuffer_object [gl context_surface surface_spec context_textures_list]
-  (let [context_texture_index (context_surface :texture_index) ;which texture is this context using
-	context_texture (context_textures_list context_texture_index) ;get that texture
-	tex_handle (context_texture :gl_handle) ;get its texture handle
-	context_surface (internal_release_context_surface gl context_surface) ;create new invalid contex surface
-	context_surface_spec (context_surface :surface_spec) ;get old surface spec
-	context_texture_spec (context_surface_spec :texture_spec) ;get old texture spec
-	surface_texture_spec (surface_spec :texture_spec) ;get new texture spec
-	[cw ch] (context_texture_spec :size) ;get current sizes
-	[dw dh] (surface_texture_spec :size) ;get desired sizes
-	newWidth (max cw dw) ;get new sizes
-	newHeight (max ch dh)
-	;create a new texture spec with the new width and height
-	new_texture_spec (assoc context_texture_spec :size [newWidth newHeight])
+(defmethod create_context_rb [:depth false] [gl attach_pt renderbuffer width height]
+  (let [depth_constant (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))]
+    (create_and_bind_renderbuffer gl depth_constant width height attach_pt)))
 
-	;create a new surface description with the updated texture specifications
-	new_surface_spec (assoc surface_spec :texture_spec new_texture_spec)
 
-	;create a new context_texture with the new texture description that reflects
-	;that we are going to change the size of its data
-	new_context_texture (assoc context_texture :gl_handle tex_handle :texture_spec new_texture_spec)
+(defmethod create_context_rb [:depth true] [gl attach_pt renderbuffer width height]
+  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
+	depth_constant (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))
+	internal_format (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))
+	tex_handle (allocate_opengl_texture_handle gl)
+	external_format GL/GL_DEPTH_COMPONENT
+	external_datatype GL/GL_FLOAT
+	binding_func (fn []
+		       (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_COMPARE_FUNC GL/GL_LEQUAL) ;write-property ) think
+		       (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_DEPTH_TEXTURE_MODE GL/GL_LUMINANCE) ;read-property, not strictly necessary to set here
+		       (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_COMPARE_MODE GL/GL_COMPARE_R_TO_TEXTURE))] ;write-property I think
+    (create_and_bind_textured_renderbuffer gl internal_format width height external_format external_datatype attach_pt binding_func)))
 
-	;update the textures list
-	new_context_textures_list (assoc context_textures_list context_texture_index new_context_texture)
+(defmulti gl_num_samples_from_num_samples identity)
+(defmethod gl_num_samples_from_num_samples :default [_] 4)
+(defmethod gl_num_samples_from_num_samples :2 [_] 2)
+(defmethod gl_num_samples_from_num_samples :8 [_] 8)
+(defmethod gl_num_samples_from_num_samples :16 [_] 16)
 
-	;create a new context surface with the new information, this allocates the actual data on card
-	new_context_surface (internal_allocate_opengl_framebuffer_object gl context_texture_index tex_handle new_surface_spec )]
-    [new_context_surface new_context_textures_list]))
+(defn create_and_bind_multisample_renderbuffer [gl attach_pt width height internal_format num_samples]
+  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
+	gl_num_samples (gl_num_samples_from_num_samples num_samples)
+	gl_attach_pt (gl_attachment_point_from_rc_attachment_point attach_pt)]
+    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
+    (. gl glRenderbufferStorageMultisampleEXT GL/GL_RENDERBUFFER_EXT gl_num_samples internal_format width height)
+    (. gl glFramebufferRenderbufferEXT 
+       GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
+    (struct context_renderbuffer rb_handle 0)))
 
-;reallocator is a function that takes a context surface spec
-;and returns a new one that is big enough to fit surface spec
-;into.
-(defn reallocate_context_surface_if_necessary [gl index all_surfaces surface_spec context_textures_list]
-  (let [ctx_src (all_surfaces index)
-	ctx_spec (ctx_src :surface_spec)
-	bytes_required (bytes_required ctx_spec surface_spec)]
-    (if ( > bytes_required 0 )
-      (let [[new_surface new_textures_list] (reallocate_opengl_framebuffer_object gl ctx_src surface_spec context_textures_list)
-	    new_all_surfaces (assoc all_surfaces index new_surface)]
-	[new_all_surfaces new_textures_list])
-	[all_surfaces context_textures_list])))
+(defmulti create_multisample_renderbuffer (fn [gl attach_pt renderbuffer width height num_samples] (renderbuffer :type)))
 
-(defn create_new_context_surface [gl surface_manager context_textures_vector surface_spec]
-  (let [all_surfaces (surface_manager :all_surfaces)
-	unused_surfaces (surface_manager :unused_surfaces)
-	[retval new_all_surfaces] (find_empty_context_surface all_surfaces)
-	[new_context_textures_list texture_index] (allocate_context_texture_item gl context_textures_vector (surface_spec :texture_spec))
-	new_context_texture (new_context_textures_list texture_index)
-	tex_handle (new_context_texture :gl_handle)
-	new_context_surface (internal_allocate_opengl_framebuffer_object gl texture_index tex_handle surface_spec)
-	new_all_surfaces (assoc new_all_surfaces retval new_context_surface)
-	new_surface_manager (assoc surface_manager :all_surfaces new_all_surfaces)]
-    [new_surface_manager new_context_textures_list retval]))
+(defmethod create_multisample_renderbuffer :color [gl attach_pt renderbuffer width height num_samples]
+  (let [rc_format (renderbuffer :color_format)
+	rc_dtype (renderbuffer :color_datatype)
+	internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)]
+    (create_and_bind_multisample_renderbuffer gl attach_pt width height internal_format num_samples)))
 
-(defn reuse_existing_context_surface [gl surface_manager context_textures_vector surface_spec index]
-  (let [all_surfaces (surface_manager :all_surfaces)
-	unused_surfaces (surface_manager :unused_surfaces)
-	[new_all_surfaces new_context_textures_list] (reallocate_context_surface_if_necessary 
-						      gl index all_surfaces surface_spec
-						      context_textures_vector)
-	new_unused_surfaces (filter #(not (== index %)) unused_surfaces)
-	new_surface_manager (assoc surface_manager :all_surfaces new_all_surfaces :unused_surfaces new_unused_surfaces)]
-    [new_surface_manager new_context_textures_list index]))
+(defmethod create_multisample_renderbuffer :depth [gl attach_pt renderbuffer width height num_samples]
+  (let [internal_format (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))]
+    (create_and_bind_multisample_renderbuffer gl attach_pt width height internal_format num_samples)))
 
-;Allocator must return a context surface if requested
-;returns a list of new surface manager along with new context surface index
-;re-allocator must take the surface spec, the list of all surfaces, and an index
-;that *may* need to be re-allocated if its width or height is less than
-;specified in the surface spec. IT should return a new list of all surfaces
-;or the current list if no allocation is desired.
-(defn allocate_context_surface [gl surface_manager context_textures_vector surface_spec ]
-  (let [all_surfaces (surface_manager :all_surfaces)
-	unused_surfaces (surface_manager :unused_surfaces)
-	best_fn #(find_best_context_surface all_surfaces unused_surfaces surface_spec)
-	best_valid_fn #(not(== % -1))
-	create_new_fn (fn [idx] (create_new_context_surface gl surface_manager context_textures_vector surface_spec))
-	reuse_existing_fn #(reuse_existing_context_surface gl surface_manager context_textures_vector surface_spec %)]
-    (find_best_match_or_create_new best_fn best_valid_fn create_new_fn reuse_existing_fn)))
+(defn create_context_surface[gl sspec]
+  (println "creating context surface")
+  (let [has_multi_sample (has_multi_sample sspec)
+	fbo_handle (allocate_opengl_framebuffer_object gl)
+	[width height] (sspec :size)
+	num_samples (sspec :num_samples)]
+    (try
+     (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo_handle)
+     (let [context_renderbuffer_mapcat_fn (if has_multi_sample
+					    (fn [[attach_pt renderbuffer]]
+					      [ attach_pt (create_multisample_renderbuffer gl attach_pt renderbuffer width height num_samples) ])
+					    (fn [[attach_pt renderbuffer]]
+					      [attach_pt (create_context_rb gl attach_pt renderbuffer width height)]))
+	   context_renderbuffers (mapcat context_renderbuffer_mapcat_fn (sspec :attachments))
+	   context_renderbuffer_map (if context_renderbuffers
+				      (apply assoc {} context_renderbuffers)
+				      {})
+	   complete (. gl glCheckFramebufferStatusEXT GL/GL_FRAMEBUFFER_EXT)]
+       (struct-map context_surface 
+	 :gl_handle fbo_handle 
+	 :surface_spec sspec 
+	 :attachments context_renderbuffer_map 
+	 :framebuffer_status complete))
+     (catch Exception e 
+       ;this is important, if an exception is thrown at a bad time
+       ;then unless you release the fbo object your program will
+       ;be unable to create more fbo's!
+       (release_opengl_framebuffer_object gl fbo_handle) 
+       (throw e))
+     (finally 
+      (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))))
 
-;Returns the index to the surface manager's unused list.
-;Returns a new surface manager
-(defn return_surface [surface_manager index]
-  (assoc surface_manager :unused_surfaces (conj (surface_manager :unused_surfaces) index)))
+(defn delete_context_surface[gl ctx_sface]
+  (when (context_surface_valid ctx_sface)
+    (println "destroying context surface")
+    (doseq [[attach_pt context_rb] (ctx_sface :attachments)]
+      (when (context_renderbuffer_texture_valid context_rb)
+	(release_opengl_texture_handle gl (context_rb :texture_gl_handle)))
+      (when (context_renderbuffer_valid context_rb)
+	(release_opengl_framebffer_renderbuffer gl (context_rb :gl_handle))))
+    (release_opengl_framebuffer_object gl (ctx_sface :gl_handle))
+    (struct-map context_surface
+      :gl_handle 0
+      :attachments {})))
+
+(defn update_context_surface[gl ctx_sface newWidth newHeight]
+  (delete_context_surface gl ctx_sface)
+  (create_context_surface gl (assoc (ctx_sface :surface_spec) :size [newWidth newHeight])))

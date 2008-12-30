@@ -9,6 +9,12 @@
 
 (defn create_texture_manager []
   (struct texture_manager []))
+
+(defn allocate_opengl_texture_handle[gl]
+  (allocate_gl_item (fn [count args offset] (. gl glGenTextures count args offset))))
+
+(defn release_opengl_texture_handle [gl hdl]
+  (release_gl_item (fn [count args offset] (. gl glDeleteTextures count args offset)) hdl))
 	
 ;takes a gl, a texture spec,
 ;and returns a context_texture
@@ -16,13 +22,14 @@
 (defn allocate_opengl_texture [gl texture_spec]
   (create_context_texture 
    texture_spec 
-   (allocate_gl_item (fn [count args offset] (. gl glGenTextures count args offset)))))
+   (allocate_opengl_texture_handle gl)
+   ))
 
 ;releases the gl handle and returns a new context texture
 ;with the handle value set to -1
 (defn release_opengl_texture [gl context_texture]
   (let [tex_handle (context_texture :gl_handle)]
-    (release_gl_item (fn [count args offset] (. gl glDeleteTextures count args offset)) tex_handle)
+    (release_opengl_texture_handle gl tex_handle)
     (create_context_texture (context_texture :texture_spec) -1)))
 
 ;A context texture is empty if its gl handle <= 0
