@@ -63,7 +63,8 @@
 
 (defstruct ui_frame_data :frame :win_data)
 
-(defn ui_create_app_frame [appName capabilities]
+(defn ui_create_app_frame 
+  ([appName capabilities]
   (. (System/getProperties) setProperty "apple.laf.useScreenMenuBar" "true")
   (. (System/getProperties) setProperty "com.apple.mrj.application.apple.menu.about.name" appName)
   (let [frame (JFrame. appName)
@@ -78,6 +79,7 @@
     (. frame setSize 800 600)
     (. frame show)
     (struct ui_frame_data frame win_data)))
+  ([appName] (ui_create_app_frame appName nil)))
 
 ;add a todo item and tell the view to redraw itself
 ;drawable fn must take only one argument, that is the drawable

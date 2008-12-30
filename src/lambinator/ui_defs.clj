@@ -50,7 +50,7 @@
   (try
    (item drawable)
    (catch Exception e
-     (dosync (ref-set render_exceptions_ref (conj @render_exceptions_ref e))))))
+     (println e))))
 
 (defn gl_display [drawable gl_todo_list_ref render_exceptions_ref gl_render_fn_ref]
   (let [todoItems (reverse @gl_todo_list_ref)

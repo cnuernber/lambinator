@@ -15,13 +15,15 @@
 (defstruct render_context  
   :glsl_manager 
   :loading_system
-  :vbo_manager )
+  :vbo_manager
+  :surfaces_ref)
 
 (defn create_render_context []
   (struct render_context 
 	  (create_rcgl_glsl_manager)
 	  (create_loading_system)
-	  (create_vbo_manager)))
+	  (create_vbo_manager)
+	  (ref {})))
     
 ;OK to call outside render thread.  You can find the program
 ;via the name you passed in later.
@@ -83,11 +85,36 @@
       program
       nil)))
 
+
+;unlike vbos or gl programs, the system is completely capable of
+;creating surfaces during the render process.  Plus, there is never a good reason
+;to pass processing off to another thread; you will always just block at the card
+;trying to create them.
+(defn rcgl_create_context_surface[render_context_ref render_tasks_ref sspec name]
+  (append_to_ref_list render_tasks_ref 
+		      #(create_named_context_surface (. % getGL) (@render_context_ref :surfaces_ref) sspec name)))
+
+;only runs if the surface exists already
+(defn rcgl_update_context_surface[render_context_ref render_tasks_ref name width height]
+  (append_to_ref_list render_tasks_ref 
+		      #(update_named_context_surface (. % getGL) (@render_context_ref :surfaces_ref) name width height)))
+
+(defn rcgl_delete_context_surface[render_context_ref render_tasks_ref name]
+  (append_to_ref_list render_tasks_ref 
+		      #(delete_named_context_surface (. % getGL) (@render_context_ref :surfaces_ref) name)))
+
+;this is meant to be called from within the render thread
+(defn rcgl_get_or_create_context_surface[render_context_ref gl sspec name]
+  (get_or_create_context_surface gl (@render_context_ref :surfaces_ref) sspec name))
+
 ;This is called when all of the resources were destroyed through nefarious means.
 ;The ones that can be regenerated will be.
 ;returns a new render context
 (defn rcgl_resources_destroyed[drawable render_context]
   (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager 
-	  { vbos_ref :vbos_ref } :vbo_manager } render_context]
+	  { vbos_ref :vbos_ref } :vbo_manager 
+	  surfaces_ref :surfaces_ref } render_context]
     (resources_released_reload_all_glsl_programs drawable programs_ref shaders_ref)
-    (vbo_resources_destroyed (. drawable getGL) vbos_ref)))
+    (vbo_resources_destroyed (. drawable getGL) vbos_ref)
+    (context_surfaces_destroyed (. drawable getGL) surfaces_ref))
+    render_context)
