@@ -1,12 +1,12 @@
 (ns lambinator.demo.wave
   (:use lambinator.ui lambinator.rcgl lambinator.rc
-	clojure.contrib.seq-utils)
+	clojure.contrib.seq-utils lambinator.util)
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)))
 
 
-(defstruct wave_demo_data :frame :wave_freq :wave_width :wave_height)
+(defstruct wave_demo_data :frame :wave_freq :wave_width :wave_height )
 
 (defn create_wave_demo_data_ref[]
   (ref (struct-map wave_demo_data
@@ -52,27 +52,30 @@
   (let [#^GL real_gl (. drawable getGL)
 	#^GL gl (DebugGL. real_gl)
 	#^GLU glu (GLU.)]
-    (. gl glClearColor 0.0 0.0 0.0 1.0)
+    (. gl glClearColor 0.0 0.0 0.2 1.0)
     (. gl glClear GL/GL_COLOR_BUFFER_BIT)
-    (when (display_predicate)
-      (. gl glUseProgram (wave_proggy :gl_handle))
-      (. gl glShadeModel GL/GL_SMOOTH)
-      (. gl glPolygonMode GL/GL_FRONT_AND_BACK GL/GL_LINE)
-      (. gl glMatrixMode GL/GL_PROJECTION)
-      (. gl glLoadIdentity )
-      (. glu gluPerspective 40  1 0.0001 1000.0)
-      (. gl glMatrixMode GL/GL_MODELVIEW)
-      (. gl glLoadIdentity)
-      (. gl glTranslatef 0.0 0.0 -150.0)
-      (. gl glRotatef -45.0 1.0 0.0 0.0)
-      (rcgl_set_glsl_prog_uniforms 
-       gl
-       [["waveTime" wave_time]
-	["waveWidth" wave_width]
-	["waveHeight" wave_height]]
-       wave_proggy )
-      (geom_fn gl)
-      (. gl glUseProgram 0))))
+    (if (display_predicate)
+      (do
+	(. gl glUseProgram (wave_proggy :gl_handle))
+	(. gl glShadeModel GL/GL_SMOOTH)
+	(. gl glPolygonMode GL/GL_FRONT_AND_BACK GL/GL_LINE)
+	(. gl glMatrixMode GL/GL_PROJECTION)
+	(. gl glLoadIdentity )
+	(. glu gluPerspective 40  1 0.0001 1000.0)
+	(. gl glMatrixMode GL/GL_MODELVIEW)
+	(. gl glLoadIdentity)
+	(. gl glTranslatef 0.0 0.0 -150.0)
+	(. gl glRotatef -45.0 1.0 0.0 0.0)
+	(rcgl_set_glsl_prog_uniforms 
+	 gl
+	 [["waveTime" wave_time]
+	  ["waveWidth" wave_width]
+	  ["waveHeight" wave_height]]
+	 wave_proggy )
+	(geom_fn gl)
+	(. gl glUseProgram 0))
+      (println "missing resources for render"))))
+
   
 ;runs one display loop of the wave demo.
 ;for a good time, remove the type inferencing support and see how long it takes...
@@ -115,11 +118,16 @@
 	wave_height (@wave_demo_data_ref :wave_height)]
     (demo_fn drawable render_context_ref wave_time wave_width wave_height)))
 
-(defn setup_wave_demo[wave_demo_data_ref demo_fn]
+(defn create_wave_drawable_fn[wave_demo_data_ref demo_fn]
   (let [fm (@wave_demo_data_ref :frame)
 	current_millis (System/currentTimeMillis)
 	rc_ref (ui_get_rcgl_render_context_ref fm)]
-    (ui_set_gl_render_fn fm #(display_animating_wave_demo % rc_ref wave_demo_data_ref current_millis demo_fn))
+    #(display_animating_wave_demo % rc_ref wave_demo_data_ref current_millis demo_fn)))
+  
+
+(defn setup_wave_demo[wave_demo_data_ref demo_fn]
+  (let [fm (@wave_demo_data_ref :frame)]
+    (ui_set_gl_render_fn fm (create_wave_drawable_fn wave_demo_data_ref demo_fn))
     (ui_set_fps_animator fm 60)
     nil))
 
@@ -175,11 +183,189 @@
   (create_wave_vbo wave_demo_data_ref)
   (setup_wave_demo wave_demo_data_ref display_vbo_wave_demo))
 
+
+(defn generate_multisample_vbo[]
+  (map 
+   float
+   [-1 -1  0 0
+    -1  1  0 1
+     1  1  1 1
+     1 -1  1 0]))
+
+(defn create_multisample_fbos[wave_demo_data_ref]
+  (let [{ { { drawable :gl_win } :win_data } :frame } @wave_demo_data_ref
+	width (. drawable getWidth)
+	height (. drawable getHeight)
+	ms_spec (create_surface_spec 
+		 { :color0 (create_renderbuffer :color :ubyte :rgb false) }
+		 width
+		 height
+		 :4)
+	trans_spec (create_surface_spec
+		    { :color0 (create_renderbuffer :color :ubyte :rgb  true) }
+		    width
+		    height)]
+    (with_context_and_tasks_refs 
+     wave_demo_data_ref
+     (fn [rc rl]
+       (rcgl_create_context_surface rc rl ms_spec "wave_multisample_surface")
+       (rcgl_create_context_surface rc rl trans_spec "wave_transfer_surface")))))
+
+(defn create_multisample_data[wave_demo_data_ref]
+  (create_multisample_fbos wave_demo_data_ref)
+  (with_context_and_tasks_refs 
+   wave_demo_data_ref
+   (fn [rc rl]
+     (rcgl_create_glsl_program 
+      rc 
+      rl
+      "../data/glsl/passthrough.glslv" 
+      "../data/glsl/single_texture.glslf"
+      "wave_final_render_prog")
+     (rcgl_create_vbo rc rl "wave_multisample_vbo" :data #(generate_multisample_vbo)))))
+
+(defn delete_multisample_data[wave_demo_data_ref]
+  (with_context_and_tasks_refs 
+   wave_demo_data_ref
+   (fn [rc rl]
+     (rcgl_delete_context_surface rc rl "wave_multisample_surface")
+     (rcgl_delete_context_surface rc rl "wave_transfer_surface")
+     (rcgl_delete_glsl_program rc rl "wave_final_render_prog")
+     (rcgl_delete_vbo rc rl "wave_multisample_vbo"))))
+
+(defn antialiasing_drawable_wrapper[drawable render_context_ref frame_resize_data wave_demo_data_ref child_drawable]
+  (let [real_gl (. drawable getGL)
+	#^GL gl (DebugGL. real_gl)
+	width (. drawable getWidth)
+	height (. drawable getHeight)
+	render_context @render_context_ref
+	ms_surface (rcgl_get_context_surface render_context "wave_multisample_surface")
+	transfer_surface (rcgl_get_context_surface render_context "wave_transfer_surface")
+	final_prog (rcgl_get_glsl_program render_context "wave_final_render_prog")
+	ms_vbo (rcgl_get_vbo render_context "wave_multisample_vbo")
+	do_aa_render (and ms_surface transfer_surface final_prog child_drawable ms_vbo)]
+    (if do_aa_render
+      (let [ms_fbo (ms_surface :gl_handle)
+	    transfer_fbo (transfer_surface :gl_handle)
+	    prog_handle (final_prog :gl_handle)
+	    transfer_tex (((transfer_surface :attachments) :color0) :texture_gl_handle)
+	    tex_att_index (((final_prog :attributes) "input_tex_coords") :index)
+	    [render_width render_height] ((ms_surface :surface_spec) :size)
+	    vbo_dtype (int (ms_vbo :gl_datatype))]
+	;have the child render to the multisample fbo
+	;the bind function sets where gl will render to
+	(. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT ms_fbo)
+	(. gl glViewport 0 0 render_width render_height)
+	(child_drawable drawable)
+        ;bind the multisample framebuffer as the read framebuffer source
+	(. gl glBindFramebufferEXT GL/GL_READ_FRAMEBUFFER_EXT ms_fbo)
+        ;bind the transfer as the draw framebuffer dest
+	(. gl glBindFramebufferEXT GL/GL_DRAW_FRAMEBUFFER_EXT transfer_fbo);
+        ;downsample the multisample fbo to the draw framebuffer's texture
+	(. gl glBlitFramebufferEXT 
+	   0 0 render_width render_height ;source rect
+	   0 0 render_width render_height ;dest rect
+	   GL/GL_COLOR_BUFFER_BIT ;what to copy over (just color in our case)
+	   GL/GL_NEAREST ) ;how to interpolate intermediate results (there aren't any; the sizes match)
+
+        ;Bind the window's render surface as the target render surface
+	(. gl GL/glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)
+	(. gl glClearColor 0.0 0.5 0.0 1.0)
+	(. gl glClear GL/GL_COLOR_BUFFER_BIT)
+	;Now we render our fullscreen quad
+	(. gl glShadeModel GL/GL_SMOOTH)
+	(. gl glPolygonMode GL/GL_FRONT_AND_BACK GL/GL_FILL)
+	(. gl glMatrixMode GL/GL_PROJECTION)
+	(. gl glLoadIdentity )
+	(. gl glMatrixMode GL/GL_MODELVIEW)
+	(. gl glLoadIdentity)
+	(. gl glUseProgram prog_handle)
+	(. gl glEnableClientState GL/GL_VERTEX_ARRAY)
+	(. gl glEnableVertexAttribArray tex_att_index)
+	(. gl glBindBuffer (vbo_gl_type_from_vbo_type (ms_vbo :type)) (ms_vbo :gl_handle))
+	(. gl glEnable GL/GL_TEXTURE_2D)
+	(. gl glActiveTexture GL/GL_TEXTURE0)
+	(. gl glBindTexture GL/GL_TEXTURE_2D transfer_tex)
+	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_NEAREST)
+	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_NEAREST)
+	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
+	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
+        ;we have how bound the second set of texture coordinates to tex coord 0
+	;each tex coord takes two entries, they have a stride of 4
+	;and they are offset from the beginning of the array by two
+	(. gl glVertexAttribPointer 
+	   tex_att_index ;index
+	   (int 2)       ;size
+	   vbo_dtype     ;type
+	   false         ;normalized
+	   (int 16)       ;stride
+	   (long 8))      ;offset
+	(rcgl_set_glsl_prog_uniforms 
+	 gl
+	 [["tex" 0]] ;set the texture param to desired logical texture unit
+	 final_prog )
+        ; Render Fullscreen Quad
+	(. gl glVertexPointer (int 2) (int (ms_vbo :gl_datatype)) (int 16) (long 0))
+        ;glDrawArrays takes the index count, not the polygon count or the array item count
+	(. gl glDrawArrays GL/GL_QUADS 0 (/ (ms_vbo :item_count) 4)) ;each index has an x and y, u and v
+	(. gl glDisableClientState GL/GL_VERTEX_ARRAY)
+	(. gl glActiveTexture GL/GL_TEXTURE0)
+	(. gl glBindBuffer (vbo_gl_type_from_vbo_type (ms_vbo :type)) 0))
+      
+      (when child_drawable
+	(child_drawable drawable)))
+    ;update frame resize data so we know how many times the drawable has rendered at this exact size
+    ;we only resize when a certain number of frames have been rendered at a certain size.
+    ;this is because resizing fbos is relative expensive and can apparently lead
+    ;to fragmentation of video ram (although I doubt the second claim)
+    (let [resize_frame_count (@frame_resize_data :resize_frame_count)
+	  [rs_width rs_height] (@frame_resize_data :resize_frame_size)
+	  resize_frame_count (if (and (== rs_width width)
+				      (== rs_height height))
+			       (inc resize_frame_count)
+			       0)
+	  fbos_missing (or (not ms_surface)
+			   (not transfer_surface))
+	  fbos_size_mismatch (or fbos_missing
+				 (not (= ((ms_surface :surface_spec) :size)
+					 [width height])))
+	  do_resize_fbo (or fbos_missing
+			    (and fbos_size_mismatch
+				 (> resize_frame_count 10)))]
+      (dosync (ref-set frame_resize_data (assoc @frame_resize_data 
+					   :resize_frame_count resize_frame_count
+					   :resize_frame_size [width height])))
+      (when do_resize_fbo
+	(create_multisample_fbos wave_demo_data_ref)))))
+
+(defmulti get_wave_demo_fn identity)
+(defmethod get_wave_demo_fn :default [_] display_vbo_wave_demo)
+(defmethod get_wave_demo_fn :simple [_] display_simple_wave_demo)
+
+(defn create_aa_drawable_fn[wave_demo_data_ref type]
+  (let [frame_resize_data (ref {:resize_frame_count 0 :resize_frame_size [0 0]})
+	fm (@wave_demo_data_ref :frame)
+	rc_ref ((fm :win_data) :render_context_ref)
+	drawable_fn (create_wave_drawable_fn wave_demo_data_ref (get_wave_demo_fn type))
+	aa_drawable_fn #(antialiasing_drawable_wrapper % rc_ref frame_resize_data wave_demo_data_ref drawable_fn)]
+    aa_drawable_fn))
+  
+
+(defn enable_antialiased_wave_demo [wave_demo_data_ref type]
+  (let [drawable_fn (create_aa_drawable_fn wave_demo_data_ref type)
+	fm (@wave_demo_data_ref :frame)]
+    (load_wave_program wave_demo_data_ref)
+    (create_wave_vbo wave_demo_data_ref)
+    (create_multisample_data wave_demo_data_ref)
+    (ui_set_gl_render_fn fm drawable_fn)
+    (ui_set_fps_animator fm 60)))
+
 (defn disable_wave_demo[wave_demo_data_ref]
   (let [fm (@wave_demo_data_ref :frame)]
     (ui_set_gl_render_fn fm nil)
     (ui_set_fps_animator fm 5) ;just ensure the window refreshes regularly
     (delete_wave_program wave_demo_data_ref)
     (delete_wave_vbo wave_demo_data_ref)
+    (delete_multisample_data wave_demo_data_ref)
     nil))
     

@@ -169,9 +169,19 @@
 
 (defmulti rcgl_set_glsl_uniform (fn [gl uniform_entry var_value] (uniform_entry :datatype)))
 ;should log that nothing got set.
-(defmethod rcgl_set_glsl_uniform :default [&args] )
+(defmethod rcgl_set_glsl_uniform :default [gl uniform_entry var_value] 
+  (println "unrecognized uniform type: " (uniform_entry :datatype)))
 (defmethod rcgl_set_glsl_uniform GL/GL_FLOAT [#^GL gl entry var_value]
   (. gl glUniform1f (entry :index) var_value))
+;You set the sample to the logical tex unit.
+;Example, if you do
+;glActiveTexture GL_TEXTURE5
+;you set the sampler to 5.  Not GL_TEXTURE5.
+(defmethod rcgl_set_glsl_uniform GL/GL_SAMPLER_2D [#^GL gl entry var_value]
+  (. gl glUniform1i (entry :index) var_value))
+
+(defmethod rcgl_set_glsl_uniform GL/GL_INT [#^GL gl entry var_value]
+  (. gl glUniform1i (entry :index) var_value))
 
 (defn rcgl_set_glsl_prog_uniforms [gl var_pair_seq rcgl_glsl_program]
   (let [{ gl_handle :gl_handle uniforms :uniforms } rcgl_glsl_program]

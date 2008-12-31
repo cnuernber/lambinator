@@ -107,6 +107,14 @@
 (defn rcgl_get_or_create_context_surface[render_context_ref gl sspec name]
   (get_or_create_context_surface gl (@render_context_ref :surfaces_ref) sspec name))
 
+(defn rcgl_get_context_surface[render_context name]
+  (let [surfaces_ref (render_context :surfaces_ref)
+	retval (@surfaces_ref name)]
+    (if (context_surface_valid_for_render retval)
+      retval
+      nil)))
+	
+
 ;This is called when all of the resources were destroyed through nefarious means.
 ;The ones that can be regenerated will be.
 ;returns a new render context

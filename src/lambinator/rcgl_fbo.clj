@@ -237,4 +237,4 @@
 				  [name (create_context_surface gl (surface :surface_spec) (surface :name))])
 			     @surfaces_ref)]
     (when new_surfaces
-      (ref-set surfaces_ref (apply assoc @surfaces_ref new_surfaces)))))
+      (dosync (ref-set surfaces_ref (apply assoc @surfaces_ref new_surfaces))))))
