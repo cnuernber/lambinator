@@ -274,8 +274,7 @@
 
         ;Bind the window's render surface as the target render surface
 	(. gl GL/glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)
-	(. gl glClearColor 0.0 0.5 0.0 1.0)
-	(. gl glClear GL/GL_COLOR_BUFFER_BIT)
+	(. gl glViewport 0 0 width height)
 	;Now we render our fullscreen quad
 	(. gl glShadeModel GL/GL_SMOOTH)
 	(. gl glPolygonMode GL/GL_FRONT_AND_BACK GL/GL_FILL)
@@ -290,8 +289,8 @@
 	(. gl glEnable GL/GL_TEXTURE_2D)
 	(. gl glActiveTexture GL/GL_TEXTURE0)
 	(. gl glBindTexture GL/GL_TEXTURE_2D transfer_tex)
-	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_NEAREST)
-	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_NEAREST)
+	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
+	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
 	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
 	(. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
         ;we have how bound the second set of texture coordinates to tex coord 0
@@ -317,7 +316,7 @@
 	(. gl glActiveTexture GL/GL_TEXTURE0)
 	(. gl glBindBuffer (vbo_gl_type_from_vbo_type (ms_vbo :type)) 0))
       
-      (when child_drawable
+      (when child_drawable ;if we can't render antialiased because we don't have buffers
 	(child_drawable drawable)))
     ;update frame resize data so we know how many times the drawable has rendered at this exact size
     ;we only resize when a certain number of frames have been rendered at a certain size.
