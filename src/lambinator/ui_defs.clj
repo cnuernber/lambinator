@@ -39,9 +39,12 @@
   (dosync (ref-set gl_todo_list_ref (conj @gl_todo_list_ref item))))
 
 (defn gl_init [drawable gl_system_strs_ref render_context_ref]
-  (update_gl_system_strs drawable gl_system_strs_ref)
-  (let [new_context (rcgl_resources_destroyed drawable @render_context_ref)]
-    (dosync (ref-set render_context_ref (merge @render_context_ref new_context)))))
+  (try
+   (update_gl_system_strs drawable gl_system_strs_ref)
+   (let [new_context (rcgl_resources_destroyed drawable @render_context_ref)]
+     (dosync (ref-set render_context_ref (merge @render_context_ref new_context))))
+   (catch Exception e
+     (println "Error duing gl_init: " (. e printStackTrace)))))
 
 ;Important that this gets wrapped in a try/catch
 ;if it doesn't, then you loose your ability to run the
@@ -50,7 +53,7 @@
   (try
    (item drawable)
    (catch Exception e
-     (println e))))
+     (. e printStackTrace))))
 
 (defn gl_display [drawable gl_todo_list_ref render_exceptions_ref gl_render_fn_ref]
   (let [todoItems (reverse @gl_todo_list_ref)

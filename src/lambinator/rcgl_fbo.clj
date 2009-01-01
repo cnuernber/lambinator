@@ -1,5 +1,9 @@
 (in-ns 'lambinator.rcgl)
 
+(defn rcgl_fbo_log [log_data_ref type & args]
+  (when log_data_ref
+    (log_message @log_data_ref "rcgl.fbo:" type args)))
+
 ;surfaces is a vector of all the known surfaces
 ;unused is a linked list of the unused surfaces
 ;render size may be <= surface size
@@ -128,15 +132,15 @@
   (let [internal_format (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))]
     (create_and_bind_multisample_renderbuffer gl attach_pt width height internal_format num_samples)))
 
-(defn create_context_surface[gl sspec name]
+(defn create_context_surface[log_data_ref gl sspec name]
   (let [has_multi_sample (has_multi_sample sspec)
 	fbo_handle (allocate_opengl_framebuffer_object gl)
 	[width height] (sspec :size)
 	num_samples (sspec :num_samples)]
     (try
      (if has_multi_sample
-       (println "creating multi-sample context surface")
-       (println "creating context surface"))
+       (rcgl_fbo_log log_data_ref :info "creating multi-sample context surface: " name)
+       (rcgl_fbo_log log_data_ref :info "creating context surface: " name))
      (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo_handle)
      (let [context_renderbuffer_mapcat_fn (if has_multi_sample
 					    (fn [[attach_pt renderbuffer]]
@@ -163,9 +167,9 @@
      (finally 
       (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))))
 
-(defn delete_context_surface[gl ctx_sface]
+(defn delete_context_surface[log_data_ref gl ctx_sface]
   (when (context_surface_valid ctx_sface)
-    (println "destroying context surface")
+    (rcgl_fbo_log log_data_ref :info "deleting context surface: " (ctx_sface :name))
     (doseq [[attach_pt context_rb] (ctx_sface :attachments)]
       (when (context_renderbuffer_texture_valid context_rb)
 	(release_opengl_texture_handle gl (context_rb :texture_gl_handle)))
@@ -176,9 +180,9 @@
       :gl_handle 0
       :attachments {})))
 
-(defn update_context_surface[gl ctx_sface newWidth newHeight]
-  (delete_context_surface gl ctx_sface)
-  (create_context_surface gl (assoc (ctx_sface :surface_spec) :size [newWidth newHeight]) (ctx_sface :name)))
+(defn update_context_surface[log_data_ref gl ctx_sface newWidth newHeight]
+  (delete_context_surface log_data_ref gl ctx_sface)
+  (create_context_surface log_data_ref gl (assoc (ctx_sface :surface_spec) :size [newWidth newHeight]) (ctx_sface :name)))
 
 (defn create_invalid_context_surface [sspec name]
   (struct-map context_surface 
@@ -195,18 +199,18 @@
      existing)))
 	 
 ;create a named context surface so you can get at it later.
-(defn create_named_context_surface[gl surfaces_ref sspec name]
+(defn create_named_context_surface[log_data_ref gl surfaces_ref sspec name]
   (let [existing (add_new_context_surface surfaces_ref sspec name)]
     (when existing
-      (delete_context_surface gl existing))
-    (let [new_surface (create_context_surface gl sspec name)]
+      (delete_context_surface log_data_ref gl existing))
+    (let [new_surface (create_context_surface log_data_ref gl sspec name)]
       (dosync (ref-set surfaces_ref (assoc @surfaces_ref name new_surface))))))
 
 ;only runs if the surface exists already
-(defn update_named_context_surface[gl surfaces_ref name width height]
+(defn update_named_context_surface[log_data_ref gl surfaces_ref name width height]
   (let [existing (@surfaces_ref name)]
     (when existing
-      (let [new_surface (update_context_surface gl existing width height)]
+      (let [new_surface (update_context_surface log_data_ref gl existing width height)]
 	(dosync (ref-set surfaces_ref (assoc @surfaces_ref name new_surface)))))))
 
 (defn remove_and_return_context_surface [surfaces_ref name]
@@ -215,26 +219,26 @@
      (ref-set surfaces_ref (dissoc @surfaces_ref name))
      existing)))
 
-(defn delete_named_context_surface[gl surfaces_ref name]
+(defn delete_named_context_surface[log_data_ref gl surfaces_ref name]
   (let [existing (remove_and_return_context_surface surfaces_ref name)]
-    (delete_context_surface gl existing)))
+    (delete_context_surface log_data_ref gl existing)))
 
 ;This will re-create or create context surfaces such that they
 ;exactly match the request.
-(defn get_or_create_context_surface[gl surfaces_ref sspec name]
+(defn get_or_create_context_surface[log_data_ref gl surfaces_ref sspec name]
   (let [existing (@surfaces_ref name)]
     (if (or (not (context_surface_valid_for_render existing))
 	    (not (= sspec (existing :surface_spec))))
       (do
-	(delete_named_context_surface gl surfaces_ref name)
-	(create_named_context_surface gl surfaces_ref sspec name)
+	(delete_named_context_surface log_data_ref gl surfaces_ref name)
+	(create_named_context_surface log_data_ref gl surfaces_ref sspec name)
 	(@surfaces_ref name))
       existing)))
 
 ;bulk re-create the surfaces
-(defn context_surfaces_destroyed[gl surfaces_ref]
+(defn context_surfaces_destroyed[log_data_ref gl surfaces_ref]
   (let [new_surfaces (mapcat (fn [[name surface]]
-				  [name (create_context_surface gl (surface :surface_spec) (surface :name))])
+				  [name (create_context_surface log_data_ref gl (surface :surface_spec) (surface :name))])
 			     @surfaces_ref)]
     (when new_surfaces
       (dosync (ref-set surfaces_ref (apply assoc @surfaces_ref new_surfaces))))))

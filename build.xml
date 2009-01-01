@@ -5,8 +5,8 @@
   </description>
 
   <property name="src" location="src"/>
+  <property name="migdemo_src" location="src/migdemo"/>
   <property name="build" location="classes"/>
-  <property name="jsrc" location="src/com/trolltech/demos"/>
 
   <available property="hasclojure" file="${clojure.jar}"/>
 
@@ -35,6 +35,9 @@
 	<path location="${qt_gcc_jar}"/>
 	<path location="${jogl_jar}"/>
 	<path location="${gluegen_jar}"/>
+	<path location="${mydoggy_jar}"/>
+	<path location="${mydoggy_plaf_jar}"/>
+	<path location="${table_layout_jar}"/>
       </classpath>
       <sysproperty key="clojure.compile.path" value="${build}"/>
       <arg value="lambinator.experiment"/>
@@ -42,9 +45,9 @@
       <arg value="lambinator.rc"/>
       <arg value="lambinator.rcgl"/>
       <arg value="lambinator.util"/>
-      <arg value="lambinator.mockgl"/>
-      <arg value="lambinator.demo.wave"/>
       <arg value="lambinator.fs"/>
+      <arg value="lambinator.log"/>
+      <arg value="lambinator.demo.wave"/>
     </java>
   </target>
 

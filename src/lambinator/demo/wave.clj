@@ -1,6 +1,7 @@
 (ns lambinator.demo.wave
   (:use lambinator.ui lambinator.rcgl lambinator.rc
-	clojure.contrib.seq-utils lambinator.util)
+	clojure.contrib.seq-utils lambinator.util
+	lambinator.log)
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)))
@@ -47,11 +48,12 @@
 (defn set_wave_height [wave_demo_data_ref val] 
   (dosync (ref-set wave_demo_data_ref (assoc @wave_demo_data_ref :wave_width val))))
 
-(defn general_display_wave_demo[drawable wave_proggy display_predicate 
+(defn general_display_wave_demo[render_context_ref drawable wave_proggy display_predicate 
 				wave_time wave_width wave_height geom_fn]
   (let [#^GL real_gl (. drawable getGL)
 	#^GL gl (DebugGL. real_gl)
-	#^GLU glu (GLU.)]
+	#^GLU glu (GLU.)
+	logger_ref (@render_context_ref :logger_ref)]
     (. gl glClearColor 0.0 0.0 0.2 1.0)
     (. gl glClear GL/GL_COLOR_BUFFER_BIT)
     (if (display_predicate)
@@ -66,7 +68,8 @@
 	(. gl glLoadIdentity)
 	(. gl glTranslatef 0.0 0.0 -150.0)
 	(. gl glRotatef -45.0 1.0 0.0 0.0)
-	(rcgl_set_glsl_prog_uniforms 
+	(rcgl_set_glsl_uniforms 
+	 @render_context_ref
 	 gl
 	 [["waveTime" wave_time]
 	  ["waveWidth" wave_width]
@@ -74,7 +77,7 @@
 	 wave_proggy )
 	(geom_fn gl)
 	(. gl glUseProgram 0))
-      (println "missing resources for render"))))
+      (log_message @logger_ref "wave demo:" :info "Missing resources for render"))))
 
   
 ;runs one display loop of the wave demo.
@@ -89,6 +92,7 @@
 (defn display_simple_wave_demo [drawable render_context_ref wave_time wave_width wave_height]
   (let [wave_proggy (rcgl_get_glsl_program @render_context_ref "wave")]
     (general_display_wave_demo 
+     render_context_ref
      drawable 
      wave_proggy 
      (fn [] wave_proggy) 
@@ -162,6 +166,7 @@
   (let [wave_proggy (rcgl_get_glsl_program @render_context_ref "wave")
 	wave_data (rcgl_get_vbo @render_context_ref "wave_data")]
     (general_display_wave_demo 
+     render_context_ref
      drawable 
      wave_proggy 
      (fn [] (and wave_proggy wave_data)) 
@@ -182,7 +187,6 @@
   (load_wave_program wave_demo_data_ref)
   (create_wave_vbo wave_demo_data_ref)
   (setup_wave_demo wave_demo_data_ref display_vbo_wave_demo))
-
 
 (defn generate_multisample_vbo[]
   (map 
@@ -300,7 +304,8 @@
 	   false         ;normalized
 	   (int 16)       ;stride
 	   (long 8))      ;offset
-	(rcgl_set_glsl_prog_uniforms 
+	(rcgl_set_glsl_uniforms
+	 @render_context_ref
 	 gl
 	 [["tex" 0]] ;set the texture param to desired logical texture unit
 	 final_prog )

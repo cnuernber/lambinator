@@ -1,5 +1,9 @@
 (in-ns 'lambinator.rcgl)
 
+(defn rcgl_vbo_log [log_data_ref type & args]
+  (when log_data_ref
+    (log_message @log_data_ref "rcgl.glsl:" type args)))
+
 ;gl supports two array types, ones for data and ones for index.
 (def vbo_types [:data :index])
 (def vbo_datatypes [:ubyte :ushort :float])
@@ -26,15 +30,14 @@
 (defmethod item_size_from_clojure_type :default [_] 4)
 (defmethod item_size_from_clojure_type Short/TYPE [_] 2)
 (defmethod item_size_from_clojure_type Byte/TYPE [_] 1)
-(defmethod item_size_from_clojure_type Integer/TYPE [_] 4)
 
 ;datatype is one of the rc datatypes, ubyte ushort or float 
-(defn create_gl_vbo [gl name vbo_type data_seq generator]
+(defn create_gl_vbo [log_data_ref gl name vbo_type data_seq generator]
   (let [data_buffer (make_nio_buffer data_seq)
 	new_vbo (struct gl_vbo 0 name vbo_type generator)]
     (if data_buffer
       (do
-	(println "Creating vbo: " name)
+	(rcgl_fbo_log log_data_ref :info "Creating vbo: " name)
 	
 	(let [vbo_handle (allocate_gl_item (fn [count args offset] (. gl glGenBuffers count args offset)))
 	      vbo_gl_type (vbo_gl_type_from_vbo_type vbo_type)
@@ -46,9 +49,9 @@
 	  (assoc new_vbo :gl_handle vbo_handle :gl_datatype gl_datatype :item_count item_count)))
       new_vbo)))
 
-(defn delete_gl_vbo[gl vbo]
+(defn delete_gl_vbo[log_data_ref gl vbo]
   (when (gl_vbo_valid vbo)
-    (println "deleting vbo: " (vbo :name))
+    (rcgl_fbo_log log_data_ref :info "deleting vbo: " (vbo :name))
     (release_gl_item (fn [count args offset] (. gl glDeleteBuffers count args offset)) (vbo :gl_handle)))
   (assoc vbo :gl_handle 0))
 
@@ -64,33 +67,33 @@
      (ref-set vbos_ref (dissoc @vbos_ref name))
      existing)))
 
-(defn update_vbo[gl vbos_ref name generator]
+(defn update_vbo[log_data_ref gl vbos_ref name generator]
   (let [existing (@vbos_ref name)]
     (when existing
       (let [vbo_type (existing :type)
 	    generate_seq (generator)
-	    new_vbo (create_gl_vbo gl name vbo_type generate_seq generator)]
-	(delete_gl_vbo gl existing)
-	(dosync (ref-set vbos_ref (assoc @vbos_ref name new_vbo)))))))
+	    new_vbo (create_gl_vbo log_data_ref gl name vbo_type generate_seq generator)]
+	(dosync (ref-set vbos_ref (assoc @vbos_ref name new_vbo)))
+	(delete_gl_vbo log_data_ref gl existing)))))
 
-(defn create_vbo [gl vbos_ref name vbo_type generator]
+(defn create_vbo [log_data_ref gl vbos_ref name vbo_type generator]
   (let [existing (add_new_vbo gl vbos_ref name vbo_type)]
     (when existing
-      (delete_gl_vbo gl existing))
-    (update_vbo gl vbos_ref name generator)))
+      (delete_gl_vbo log_data_ref gl existing))
+    (update_vbo log_data_ref gl vbos_ref name generator)))
 
-(defn delete_vbo [gl vbos_ref name]
+(defn delete_vbo [log_data_ref gl vbos_ref name]
   (let [existing (get_and_remove_vbo vbos_ref name)]
     (when existing
-      (delete_gl_vbo gl existing))))
+      (delete_gl_vbo log_data_ref gl existing))))
 
 ;called when all of the system resources need to be rebooted.
-(defn vbo_resources_destroyed[gl vbos_ref]
+(defn vbo_resources_destroyed[log_data_ref gl vbos_ref]
   (let [new_vbos (mapcat (fn [[name vbo]]
 			   (let [generator (vbo :generator)
 				 data_seq (generator)
 				 vbo_type (vbo :vbo_type)
-				 new_vbo (create_gl_vbo gl (vbo :name) vbo_type data_seq generator)]
+				 new_vbo (create_gl_vbo log_data_ref gl (vbo :name) vbo_type data_seq generator)]
 			     [name new_vbo]))
 			 @vbos_ref)]
     (when new_vbos

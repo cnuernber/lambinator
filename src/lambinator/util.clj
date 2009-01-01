@@ -1,6 +1,7 @@
 (ns lambinator.util
   (:import (java.lang.reflect Modifier)
-	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer))
+	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)
+	   (java.util.regex Pattern))
   (:use clojure.contrib.except))
 
 (defn find_static_fields_by_value [cls_name val]
@@ -67,12 +68,24 @@
       (make_nio_buffer_data data_seq first_item)
       nil)))
 
+;This does not put spaces in things.  It is meant for
+;literal stringification
 (defn stringify [& args]
-  (if args
-    (with-out-str
-     (apply print args))
-    ""))
+  (let [builder (StringBuilder. )]
+    (doseq [arg args]
+      (. builder append (str arg)))
+    (. builder toString)))
 
 (defn throw_if_item_missing [item coll & args]
   (when (not (some (partial = item) coll))
     (throwf (stringify args))))
+
+(defn split_on_newline [str]
+  (if str
+    (re-seq (Pattern/compile "[^\n]+") str)
+    nil))
+
+(defn split_on_whitespace [str]
+  (if str
+    (re-seq (Pattern/compile "\\S+") str)
+    nil))
