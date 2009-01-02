@@ -110,41 +110,44 @@
 (defmethod gl_num_samples_from_num_samples :8 [_] 8)
 (defmethod gl_num_samples_from_num_samples :16 [_] 16)
 
-(defn create_and_bind_multisample_renderbuffer [gl attach_pt width height internal_format num_samples]
+(defn create_and_bind_multisample_renderbuffer [log_data_ref gl attach_pt width height internal_format num_samples]
   (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
 	gl_num_samples (gl_num_samples_from_num_samples num_samples)
 	gl_attach_pt (gl_attachment_point_from_rc_attachment_point attach_pt)]
+    (rcgl_fbo_log log_data_ref :info "allocating multisample renderbuffer (samples): " num_samples )
     (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
     (. gl glRenderbufferStorageMultisampleEXT GL/GL_RENDERBUFFER_EXT gl_num_samples internal_format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
     (struct context_renderbuffer rb_handle 0)))
 
-(defmulti create_multisample_renderbuffer (fn [gl attach_pt renderbuffer width height num_samples] (renderbuffer :type)))
+(defn create_multisample_renderbuffer_dispatch [log_data_ref gl attach_pt renderbuffer & args] (renderbuffer :type))
 
-(defmethod create_multisample_renderbuffer :color [gl attach_pt renderbuffer width height num_samples]
+(defmulti create_multisample_renderbuffer create_multisample_renderbuffer_dispatch )
+
+(defmethod create_multisample_renderbuffer :color [log_data_ref gl attach_pt renderbuffer width height num_samples]
   (let [rc_format (renderbuffer :color_format)
 	rc_dtype (renderbuffer :color_datatype)
 	internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)]
-    (create_and_bind_multisample_renderbuffer gl attach_pt width height internal_format num_samples)))
+    (create_and_bind_multisample_renderbuffer log_data_ref gl attach_pt width height internal_format num_samples)))
 
-(defmethod create_multisample_renderbuffer :depth [gl attach_pt renderbuffer width height num_samples]
+(defmethod create_multisample_renderbuffer :depth [log_data_ref gl attach_pt renderbuffer width height num_samples]
   (let [internal_format (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))]
-    (create_and_bind_multisample_renderbuffer gl attach_pt width height internal_format num_samples)))
+    (create_and_bind_multisample_renderbuffer log_data_ref gl attach_pt width height internal_format num_samples)))
 
 (defn create_context_surface[log_data_ref gl sspec name]
   (let [has_multi_sample (has_multi_sample sspec)
 	fbo_handle (allocate_opengl_framebuffer_object gl)
 	[width height] (sspec :size)
-	num_samples (sspec :num_samples)]
+	num_samples (sspec :multi_sample)]
     (try
      (if has_multi_sample
-       (rcgl_fbo_log log_data_ref :info "creating multi-sample context surface: " name)
+       (rcgl_fbo_log log_data_ref :info "creating multi-sample context surface: " name " , number of samples: " num_samples )
        (rcgl_fbo_log log_data_ref :info "creating context surface: " name))
      (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo_handle)
      (let [context_renderbuffer_mapcat_fn (if has_multi_sample
 					    (fn [[attach_pt renderbuffer]]
-					      [ attach_pt (create_multisample_renderbuffer gl attach_pt renderbuffer width height num_samples) ])
+					      [ attach_pt (create_multisample_renderbuffer log_data_ref gl attach_pt renderbuffer width height num_samples) ])
 					    (fn [[attach_pt renderbuffer]]
 					      [attach_pt (create_context_rb gl attach_pt renderbuffer width height)]))
 	   context_renderbuffers (mapcat context_renderbuffer_mapcat_fn (sspec :attachments))
@@ -152,6 +155,7 @@
 				      (apply assoc {} context_renderbuffers)
 				      {})
 	   complete (. gl glCheckFramebufferStatusEXT GL/GL_FRAMEBUFFER_EXT)]
+       (rcgl_fbo_log log_data_ref :info "Framebuffer complete: " (get_opengl_constant_name complete))
        (struct-map context_surface 
 	 :gl_handle fbo_handle 
 	 :surface_spec sspec 
@@ -162,7 +166,7 @@
        ;this is important, if an exception is thrown at a bad time
        ;then unless you release the fbo object your program will
        ;be unable to create more fbo's!
-       (release_opengl_framebuffer_object gl fbo_handle) 
+       (release_opengl_framebuffer_object log_data_ref gl fbo_handle) 
        (throw e))
      (finally 
       (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))))
@@ -206,6 +210,7 @@
     (let [new_surface (create_context_surface log_data_ref gl sspec name)]
       (dosync (ref-set surfaces_ref (assoc @surfaces_ref name new_surface))))))
 
+
 ;only runs if the surface exists already
 (defn update_named_context_surface[log_data_ref gl surfaces_ref name width height]
   (let [existing (@surfaces_ref name)]
@@ -222,6 +227,16 @@
 (defn delete_named_context_surface[log_data_ref gl surfaces_ref name]
   (let [existing (remove_and_return_context_surface surfaces_ref name)]
     (delete_context_surface log_data_ref gl existing)))
+
+(defn create_named_context_surface_seq[log_data_ref gl surfaces_ref sspec_seq name]
+  (first (filter (fn [sspec]
+		   (create_named_context_surface log_data_ref gl surfaces_ref sspec name) ;create the object.  side effect alert.
+		   (. gl glGetError) ;clear out any gl errors
+		   (= ((@surfaces_ref name) :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)) ;if it is complete, then stop
+		 sspec_seq))
+  (when (not (= ((@surfaces_ref name) :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT))
+    (delete_named_context_surface log_data_ref gl surfaces_ref name))
+  nil) ;none of the surfaces were complete.  this avoides gl errors...
 
 ;This will re-create or create context surfaces such that they
 ;exactly match the request.

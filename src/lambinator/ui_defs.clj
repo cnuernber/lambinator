@@ -112,9 +112,6 @@
 			   ScrollPaneConstants/HORIZONTAL_SCROLLBAR_NEVER)]
     pane))
 
-(defmacro add_with_constraints [item constraints parent & rest]
-	`(do (sets! ~constraints ~@rest) (. ~parent add ~item ~constraints)))
-
 (defn get_gl_system_property [name gl_system_strs_ref]
   (@gl_system_strs_ref name))
 

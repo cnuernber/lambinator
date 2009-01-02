@@ -77,10 +77,13 @@
 	(delete_gl_vbo log_data_ref gl existing)))))
 
 (defn create_vbo [log_data_ref gl vbos_ref name vbo_type generator]
-  (let [existing (add_new_vbo gl vbos_ref name vbo_type)]
-    (when existing
-      (delete_gl_vbo log_data_ref gl existing))
-    (update_vbo log_data_ref gl vbos_ref name generator)))
+  (let [existing (add_new_vbo gl vbos_ref name vbo_type)
+	matches_exactly (and existing
+			     (= (existing :vbo_type) vbo_type))]
+    (when (not matches_exactly)
+      (when existing
+	(delete_gl_vbo log_data_ref gl existing))
+      (update_vbo log_data_ref gl vbos_ref name generator))))
 
 (defn delete_vbo [log_data_ref gl vbos_ref name]
   (let [existing (get_and_remove_vbo vbos_ref name)]

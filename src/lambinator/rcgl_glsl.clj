@@ -313,12 +313,17 @@
 (defn add_new_glsl_program[log_data_ref gl programs_ref shaders_ref loading_system render_tasks_ref glslv_filename glslf_filename prog_name]
   (let [existing (@programs_ref prog_name)
 	vs (@shaders_ref glslv_filename)
-	fs (@shaders_ref glslf_filename)]
+	fs (@shaders_ref glslf_filename)
+	matches_exactly (and existing
+			     (= ((existing :vert_shader) :filename) glslv_filename)
+			     (= ((existing :frag_shader) :filename) glslf_filename))]
     (maybe_begin_shader_load log_data_ref programs_ref shaders_ref loading_system render_tasks_ref glslv_filename vs)
     (maybe_begin_shader_load log_data_ref programs_ref shaders_ref loading_system render_tasks_ref glslf_filename fs)
-    (dosync (ref-set programs_ref (assoc @programs_ref prog_name (create_invalid_glsl_program glslv_filename glslf_filename prog_name))))
-    (when existing
-      (delete_glsl_program log_data_ref gl existing))
+    
+    (when (not matches_exactly)
+      (dosync (ref-set programs_ref (assoc @programs_ref prog_name (create_invalid_glsl_program glslv_filename glslf_filename prog_name))))
+      (when existing
+	(delete_glsl_program log_data_ref gl existing)))
     (when (and (glsl_shader_valid vs) (glsl_shader_valid fs))
       (update_programs log_data_ref gl programs_ref shaders_ref))))
 

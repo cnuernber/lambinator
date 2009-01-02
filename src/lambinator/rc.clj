@@ -81,8 +81,8 @@
 (defn surface_details_match [surface1 surface2]
   (and (= (surface1 :attachments)
 	  (surface2 :attachments))
-       (= (surface1 :num_samples)
-	  (surface2 :num_samples))))
+       (= (surface1 :multi_sample)
+	  (surface2 :multi_sample))))
 
 ;how many bytes would you have to allocate to
 ;fit desired in surface

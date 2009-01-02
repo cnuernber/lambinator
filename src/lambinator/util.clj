@@ -18,8 +18,12 @@
 	fld (. cls getField fld_name)]
     (when fld (. fld get nil))))
 
+;These are used pirmarily for ui stuff
 (defmacro sets! [vars & rest]  
   `(do ~@(map (fn [flds] `(set! (. ~vars ~(first flds)) ~(second flds))) (apply array-map rest))))
+
+(defmacro add_with_constraints [item constraints parent & rest]
+	`(do (sets! ~constraints ~@rest) (. ~parent add ~item ~constraints)))
 
 ;find next unused item index from a vector of items.
 ;filter takes an item, and returns true if it is unused.

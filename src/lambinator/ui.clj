@@ -72,15 +72,16 @@
   (let [window_mgr (MyDoggyToolWindowManager.)
 	log_pane (create_label "")
 	newTool (JScrollPane. log_pane)
-	newPanel (JPanel.)
-	weird_palette (create_label "Palette so my app doesn't look weird" )]
+	inspector_panel (JPanel.)
+	inspector_scroll (JScrollPane. inspector_panel
+				       ScrollPaneConstants/VERTICAL_SCROLLBAR_AS_NEEDED
+				       ScrollPaneConstants/HORIZONTAL_SCROLLBAR_NEVER)]
     
     (. window_mgr registerToolWindow "Log" "Application Log" nil newTool ToolWindowAnchor/BOTTOM)
-    (. window_mgr registerToolWindow "Inspector" "Inspector Palette" nil newPanel ToolWindowAnchor/RIGHT)
-    (. window_mgr registerToolWindow "Anti-Weird" "Anti-Weird Palette" nil weird_palette ToolWindowAnchor/LEFT)
+    (. window_mgr registerToolWindow "Inspector" "Inspector Palette" nil inspector_scroll ToolWindowAnchor/RIGHT)
     (doseq [window (. window_mgr getToolWindows)]
       (. window setAvailable true))
-    [window_mgr log_pane newPanel]))
+    [window_mgr log_pane inspector_panel]))
 
 (defn ui_add_log_message[frame_data module type & args]
   (let [log_window (frame_data :log_pane)
@@ -128,7 +129,6 @@
 	(fn [] 
 	  (. (. window_mgr getToolWindow "Log") setActive true)
 	  (. (. window_mgr getToolWindow "Inspector") setActive true)
-	  (. (. window_mgr getToolWindow "Anti-Weird") setActive true)
 	  (. frame setVisible true)))
        (let [retval (struct ui_frame_data frame win_data log_label inspector (ref nil) 1000)]
 	 (dosync (ref-set logger_ref (log_add_listener @logger_ref 

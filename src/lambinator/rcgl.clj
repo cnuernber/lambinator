@@ -100,6 +100,12 @@
   (append_to_ref_list render_tasks_ref 
 		      #(create_named_context_surface (@render_context_ref :logger_ref) (. % getGL) (@render_context_ref :surfaces_ref) sspec name)))
 
+;Create a context surface using a list of fallbacks
+(defn rcgl_create_context_surface_seq[render_context_ref render_tasks_ref sspec_seq name]
+  (append_to_ref_list render_tasks_ref 
+		      #(create_named_context_surface_seq (@render_context_ref :logger_ref) (. % getGL) (@render_context_ref :surfaces_ref) sspec_seq name)))
+
+
 ;only runs if the surface exists already
 (defn rcgl_update_context_surface[render_context_ref render_tasks_ref name width height]
   (append_to_ref_list render_tasks_ref 

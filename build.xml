@@ -47,6 +47,7 @@
       <arg value="lambinator.util"/>
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>
+      <arg value="lambinator.ui.inspector"/>
       <arg value="lambinator.demo.wave"/>
     </java>
   </target>
