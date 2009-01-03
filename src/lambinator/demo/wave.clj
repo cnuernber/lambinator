@@ -430,6 +430,10 @@
 	  render_context_ref ((frame :win_data ) :render_context_ref)
 	  watcher_system (frame :file_watcher_system)]
       (dosync (alter wave_demo_ref #(assoc % keyword new_temp_fname))) ;remember that we have been here
+      (ui_add_hook frame :close_hooks_ref 
+		   (fn []
+		     (dosync (alter wave_demo_ref #(assoc % keyword nil))) ;no more associated
+		     (. (File. new_temp_fname) delete)))
       ;create new valid edited program
       (let [vert_shader (get_first_non_null [(@wave_demo_ref :glslv_edited) "/data/glsl/wave.glslv"])
 	    frag_shader (get_first_non_null [(@wave_demo_ref :glslf_edited) "/data/glsl/wave.glslf"])]
@@ -521,6 +525,7 @@
 		    #(handle_wave_glsl_edit retval :glslf_edited "/data/glsl/wave.glslf"))
 	inspector_items [aa_item geom_item freq_item width_item height_item glslv_item glslf_item]]
     (dosync (ref-set retval (assoc @retval :inspector_items inspector_items)))
+    (ui_add_hook frame :close_hooks_ref #(disable_wave_demo retval))
     (demo_setup_inspector_panel retval)
     (reset_wave_demo retval)
     (. (frame :frame) setVisible true)

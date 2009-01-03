@@ -215,7 +215,7 @@
 	  (try
 	   (watcher name)
 	   (catch Exception e
-	     (println (. e getStackTrace))))))
+	     (. e printStackTrace)))))
       (dosync 
        (alter (fs_watcher_system :file_watchers_ref)
 	      (fn [fname_watchers]

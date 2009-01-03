@@ -6,7 +6,7 @@
 	   (javax.swing.text.html HTMLEditorKit)
 	   (com.sun.opengl.util FPSAnimator)
 	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension)
-	   (java.awt.event ActionListener)
+	   (java.awt.event ActionListener WindowListener ComponentListener)
 	   (java.util.regex Pattern)
 	   (java.util.concurrent CountDownLatch)
 	   (java.util Timer TimerTask Date)
@@ -68,9 +68,6 @@
 	    gl_render_fn_ref
 	    (ref nil))))
 
-(defstruct ui_frame_data :frame :win_data :log_pane :inspector_pane :log_messages_ref :log_message_len
-	   :file_watcher_system )
-
 (defn init_tool_window_manager[]
   (let [window_mgr (MyDoggyToolWindowManager.)
 	log_pane (create_label "")
@@ -96,22 +93,51 @@
 	      args_str_lines (reverse (map (fn [line]
 					     (stringify module " " (name type) ": " line))
 					   (split_on_newline (apply stringify (flatten args)))))
-	      new_message_list (take (frame_data :log_message_len) (concat args_str_lines @log_messages_ref))
-	      builder (StringBuilder.)]
+	      new_message_list (take @(frame_data :log_length_ref) (concat args_str_lines @log_messages_ref))]
 	  (dosync (ref-set log_messages_ref new_message_list))
-	  (. builder append "<html>")
-	  (doseq [msg (reverse new_message_list)]
-	    (. builder append msg)
-	    (. builder append "<br>\n"))
-	  (. builder append "</html>")
-	  (SwingUtilities/invokeLater 
-	   (fn []
-	     (. log_window setText (. builder toString))))
 	  nil)
 	(catch Exception e
-	  (. e printStackTrace)
-	 nil))))))
+	  (. e printStackTrace)))
+       nil))))
 	
+(defn ui_run_hook_list [frame_data keyword]
+  (doseq [hook @(frame_data keyword)]
+    (try
+     (hook)
+     (catch Exception e
+       (. e printStackTrace)))))
+
+(defstruct ui_frame_data :frame :win_data :log_pane :inspector_pane :log_messages_ref :log_length_ref
+	   :file_watcher_system 
+	   :close_hooks_ref
+	   :hidden_hooks_ref
+	   :shown_hooks_ref)
+
+(defn cancel_filemod_time [filemod_timer]
+  (when @filemod_timer
+    (. @filemod_timer cancel)
+    (dosync (ref-set filemod_timer nil))))
+
+(defn create_timer_task [lmbda] 
+  (proxy [TimerTask] []
+    (run 
+     []
+     (lmbda))))
+
+(defn check_and_update_log_window[log_messages_ref my_messages_ref log_window]
+  (when-not (= @my_messages_ref @log_messages_ref)
+    (dosync (ref-set my_messages_ref @log_messages_ref))
+    (let [new_message_list @my_messages_ref
+	  builder (StringBuilder.)]
+      (. builder append "<html>")
+      (doseq [msg (reverse new_message_list)]
+	(. builder append msg)
+	(. builder append "<br>\n"))
+      (. builder append "</html>")
+      (SwingUtilities/invokeLater 
+       (fn []
+	 (. log_window setText (. builder toString)))))))
+
 (defn ui_create_app_frame 
   ([appName capabilities]
      (. (System/getProperties) setProperty "apple.laf.useScreenMenuBar" "true")
@@ -123,13 +149,8 @@
 	   bar (JMenuBar.)
 	   menu (JMenu. "About")
 	   file_mod_watcher_system (create_file_mod_watcher_system)
-	   #^TimerTask task (proxy [TimerTask] []
-				   (run 
-				    []
-				    (fs_mod_system_check_files file_mod_watcher_system)))
-	   filemod_timer (Timer.) 
+	   filemod_timer (ref nil)
 	   [window_mgr log_label inspector] (init_tool_window_manager)]
-       (. filemod_timer schedule task (Date.) (long 300))
        (.. frame getContentPane (setLayout (BorderLayout.)))
        (.. frame getContentPane (add window_mgr))
        (. (. window_mgr getContentManager) addContent "gl_panel" nil nil panel)
@@ -143,14 +164,74 @@
 	  (. (. window_mgr getToolWindow "Log") setActive true)
 	  (. (. window_mgr getToolWindow "Inspector") setActive true)
 	  (. frame setVisible true)))
-       (let [retval (struct ui_frame_data frame win_data log_label inspector (ref nil) 1000
-			    file_mod_watcher_system)]
+       (let [retval (struct-map ui_frame_data 
+		      :frame frame
+		      :win_data win_data
+		      :log_pane log_label
+		      :inspector_pane inspector
+		      :log_messages_ref (ref nil) 
+		      :log_length_ref (ref 1000)
+		      :file_watcher_system file_mod_watcher_system
+		      :close_hooks_ref (ref nil)
+		      :hidden_hooks_ref (ref nil)
+		      :shown_hooks_ref (ref nil))
+	     window_listener (proxy [Object WindowListener] []
+			       (windowActivated [_])
+			       (windowClosed[_])
+			       (windowClosing[_]
+				(. frame setVisible false)
+				(. frame dispose)
+				(cancel_filemod_time filemod_timer)
+				(ui_run_hook_list retval :close_hooks_ref)
+				;destroy the render context
+				(dosync (ref-set render_context_ref (create_render_context logger_ref)))
+				)
+			       (windowOpened [_])
+			       (windowDeactivated [_])
+			       (windowDeiconified [_])
+			       (windowIconified [_]))
+	     component_listener (proxy [Object ComponentListener] []
+				  (componentHidden
+				   [_] 
+				   (cancel_filemod_time filemod_timer)
+				   (ui_run_hook_list retval :hidden_hooks_ref))
+				  (componentMoved[_] )
+				  (componentResized[_] )
+				  (componentShown
+				   [_]
+				   (try
+				    (when (not @filemod_timer)
+				      (dosync (ref-set filemod_timer (Timer.)))
+				      (. @filemod_timer 
+					 schedule  
+					 (create_timer_task #(fs_mod_system_check_files file_mod_watcher_system ))
+					 (Date.) 
+					 (long 300))
+				      (let [printed_messages_ref (ref nil)]
+					(. @filemod_timer 
+					   schedule  
+					   (create_timer_task #(check_and_update_log_window (retval :log_messages_ref) printed_messages_ref log_label))
+					   (Date.) 
+					   (long 300))))
+				    
+				    (catch Exception e
+				      (. e printStackTrace)))
+				   (ui_run_hook_list retval :shown_hooks_ref)))]
+	 (. frame addWindowListener window_listener)
+	 (. frame addComponentListener component_listener)
 	 (dosync (ref-set logger_ref (log_add_listener @logger_ref 
 						       (fn [module type & args]
 							 (ui_add_log_message retval module type args)))))
-	 
 	 retval)))
   ([appName] (ui_create_app_frame appName nil)))
+
+;:close_hooks_ref
+;:hidden_hooks_ref
+;:shown_hooks_ref
+(defn ui_add_hook [frame_data keyword lmbda]
+  (let [hooks_ref (frame_data keyword)]
+    (when (and hooks_ref lmbda)
+      (dosync (alter hooks_ref conj lmbda)))))
 
 ;add a todo item and tell the view to redraw itself
 ;drawable fn must take only one argument, that is the drawable

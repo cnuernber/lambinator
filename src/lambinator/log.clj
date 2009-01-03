@@ -24,7 +24,7 @@
       (try
        (apply listener module type args)
        (catch Exception e
-	 (println (. e getStackTrace)))))
+	 (. e printStackTrace))))
     (let [args_str (apply stringify (flatten args))]
       (println module type args_str))))
 
