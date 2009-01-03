@@ -1,10 +1,12 @@
 (ns lambinator.demo.wave
   (:use lambinator.ui lambinator.rcgl lambinator.rc
 	clojure.contrib.seq-utils lambinator.util
-	lambinator.log lambinator.ui.inspector)
+	lambinator.log lambinator.ui.inspector
+	lambinator.fs)
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
-	  (javax.media.opengl.glu GLU)))
+	  (javax.media.opengl.glu GLU)
+	  (java.util Timer)))
 
 (defn with_context_and_tasks_refs[wave_demo_data_ref lambda]
   (let [fm (@wave_demo_data_ref :frame)
@@ -19,14 +21,16 @@
    #(rcgl_create_glsl_program 
      %1 
      %2
-     "../data/glsl/wave.glslv" 
-     "../data/glsl/wave.glslf"
+     "/data/glsl/wave.glslv" 
+     "/data/glsl/wave.glslf"
      "wave")))
 
 (defn delete_wave_program [wave_demo_data_ref]
   (with_context_and_tasks_refs
    wave_demo_data_ref
-   #(rcgl_delete_glsl_program %1 %2 "wave")))
+   (fn [rc rl]
+     (rcgl_delete_glsl_program rc rl "wave")
+     (rcgl_delete_glsl_program rc rl "wave-edited"))))
 
 
 (defn set_wave_frequency [wave_demo_data_ref val] 
@@ -69,6 +73,9 @@
 	(. gl glUseProgram 0))
       (log_message @logger_ref "wave demo:" :info "Missing resources for render"))))
 
+
+(defn get_first_valid_glsl_program [render_context program_name_seq]
+  (first (filter identity (map #(rcgl_get_glsl_program render_context %) program_name_seq))))
   
 ;runs one display loop of the wave demo.
 ;for a good time, remove the type inferencing support and see how long it takes...
@@ -80,7 +87,7 @@
 ;and manipulate the normal map such that you got better wave looks without
 ;millions of more polygons.
 (defn display_simple_wave_demo [drawable render_context_ref wave_time wave_width wave_height]
-  (let [wave_proggy (rcgl_get_glsl_program @render_context_ref "wave")]
+  (let [wave_proggy (get_first_valid_glsl_program @render_context_ref ["wave-edited" "wave"])]
     (general_display_wave_demo 
      render_context_ref
      drawable 
@@ -153,7 +160,7 @@
 
 
 (defn display_vbo_wave_demo [drawable render_context_ref wave_time wave_width wave_height]
-  (let [wave_proggy (rcgl_get_glsl_program @render_context_ref "wave")
+  (let [wave_proggy (get_first_valid_glsl_program @render_context_ref ["wave-edited" "wave"])
 	wave_data (rcgl_get_vbo @render_context_ref "wave_data")]
     (general_display_wave_demo 
      render_context_ref
@@ -222,8 +229,8 @@
      (rcgl_create_glsl_program 
       rc 
       rl
-      "../data/glsl/passthrough.glslv" 
-      "../data/glsl/single_texture.glslf"
+      "/data/glsl/passthrough.glslv" 
+      "/data/glsl/single_texture.glslf"
       "wave_final_render_prog")
      (rcgl_create_vbo rc rl "wave_multisample_vbo" :data #(generate_multisample_vbo)))))
 
@@ -388,7 +395,9 @@
     nil))
 
 (defonce geom_choices_array [:immediate :vbo])
-(defstruct wave_demo_data :frame :wave_freq :wave_width :wave_height :num_samples :geom_type :inspector_items)
+(defstruct wave_demo_data :frame :wave_freq :wave_width :wave_height 
+	   :num_samples :geom_type :inspector_items
+	   :glslv_edited :glslf_edited)
 
 (defn reset_wave_demo[demo_data_ref]
   (load_wave_program demo_data_ref)
@@ -401,7 +410,54 @@
 	fm (@demo_data_ref :frame)]
     (ui_set_gl_render_fn fm drawable_fn)
     (ui_set_fps_animator fm 60)))
-	
+
+(defn demo_setup_inspector_panel [wave_demo_data_ref]
+  (let [demo_data @wave_demo_data_ref
+	frame (demo_data :frame)
+	items (demo_data :inspector_items)]
+    (setup_inspector_panel (frame :inspector_pane) (demo_data :inspector_items))))
+
+(defn get_first_non_null[items]
+  (first (filter #(not(nil? %)) items)))
+
+;if the file doesn't exist in the temp directory	
+(defn handle_wave_glsl_edit [wave_demo_ref keyword resource_name]
+  (when-not (@wave_demo_ref keyword)
+    ;perform copy to temp dir
+    (let [new_temp_file (fs_get_temp_file resource_name)
+	  new_temp_fname (. new_temp_file getCanonicalPath)
+	  frame (@wave_demo_ref :frame)
+	  render_context_ref ((frame :win_data ) :render_context_ref)
+	  watcher_system (frame :file_watcher_system)]
+      (dosync (alter wave_demo_ref #(assoc % keyword new_temp_fname))) ;remember that we have been here
+      ;create new valid edited program
+      (let [vert_shader (get_first_non_null [(@wave_demo_ref :glslv_edited) "/data/glsl/wave.glslv"])
+	    frag_shader (get_first_non_null [(@wave_demo_ref :glslf_edited) "/data/glsl/wave.glslf"])]
+	(fs_copy_item_stream_to_file resource_name new_temp_fname)
+	(with_context_and_tasks_refs
+	 wave_demo_ref
+	 (fn [rc rl]
+	   (rcgl_create_glsl_program 
+	    rc 
+	    rl
+	    vert_shader 
+	    frag_shader
+	    "wave-edited")))
+	(fs_add_file_mod_watcher 
+	 watcher_system ;system
+	 new_temp_fname ;file to watch
+	 keyword ;name of the watcher
+	 (fn [fname]
+	   (ui_add_log_message frame "wave" :info "reloading shader: " fname)
+	   (with_context_and_tasks_refs wave_demo_ref 
+					(fn [render_context_ref render_list_ref]
+					  (rcgl_load_shader 
+					   render_context_ref 
+					   render_list_ref 
+					   new_temp_fname))))))))
+  
+  (let [edited (@wave_demo_ref keyword)]
+    (run_cmd ["open" edited])))
 
 (defn create_wave_demo[]
   (let [frame (ui_create_app_frame "wave demo")
@@ -455,9 +511,17 @@
 		     (fn [] (@retval :wave_height))
 		     (fn [val] (dosync (ref-set retval (assoc @retval :wave_height val))))
 		     "000.0")
-	inspector_items [aa_item geom_item freq_item width_item height_item]]
+	glslv_item (create_read_only_hyperlink_inspector_item 
+		    "Vertex Shader: "
+		    (fn [] "/data/glsl/wave.glslv")
+		    #(handle_wave_glsl_edit retval :glslv_edited "/data/glsl/wave.glslv"))
+	glslf_item (create_read_only_hyperlink_inspector_item 
+		    "Fragment Shader: "
+		    (fn [] "/data/glsl/wave.glslf")
+		    #(handle_wave_glsl_edit retval :glslf_edited "/data/glsl/wave.glslf"))
+	inspector_items [aa_item geom_item freq_item width_item height_item glslv_item glslf_item]]
     (dosync (ref-set retval (assoc @retval :inspector_items inspector_items)))
-    (setup_inspector_panel (frame :inspector_pane) inspector_items)
+    (demo_setup_inspector_panel retval)
     (reset_wave_demo retval)
     (. (frame :frame) setVisible true)
     retval))

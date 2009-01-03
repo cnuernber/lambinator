@@ -7,8 +7,8 @@
 ;surfaces is a vector of all the known surfaces
 ;unused is a linked list of the unused surfaces
 ;render size may be <= surface size
-(defstruct context_renderbuffer :gl_handle :texture_gl_handle)
-(defstruct context_surface :gl_handle :surface_spec :attachments :framebuffer_status :name )
+(defstruct context_renderbuffer :gl_handle :texture_gl_handle :gl_error)
+(defstruct context_surface :gl_handle :surface_spec :attachments :framebuffer_status :name :gl_error )
 
 (defn context_renderbuffer_valid [rb]
   (and rb
@@ -55,7 +55,7 @@
     (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal_format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
-    (struct context_renderbuffer rb_handle 0)))
+    (struct context_renderbuffer rb_handle 0 (get_gl_error gl))))
 
 (defn create_and_bind_textured_renderbuffer[gl internal_format width height external_format external_datatype attach_pt binding_func]
   (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
@@ -69,7 +69,7 @@
        GL/GL_FRAMEBUFFER_EXT 
        (gl_attachment_point_from_rc_attachment_point attach_pt) GL/GL_TEXTURE_2D 
        tex_handle 0)
-    (struct context_renderbuffer rb_handle tex_handle)))	
+    (struct context_renderbuffer rb_handle tex_handle (get_gl_error gl))))	
 
 (defmulti create_context_rb (fn [gl attach_pt renderbuffer width height] [(renderbuffer :type) (renderbuffer :use_texture)]))
 (defmethod create_context_rb [:color false] [gl attach_pt renderbuffer width height]
@@ -119,7 +119,7 @@
     (. gl glRenderbufferStorageMultisampleEXT GL/GL_RENDERBUFFER_EXT gl_num_samples internal_format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
-    (struct context_renderbuffer rb_handle 0)))
+    (struct context_renderbuffer rb_handle 0 (get_gl_error gl))))
 
 (defn create_multisample_renderbuffer_dispatch [log_data_ref gl attach_pt renderbuffer & args] (renderbuffer :type))
 
@@ -161,7 +161,8 @@
 	 :surface_spec sspec 
 	 :attachments context_renderbuffer_map 
 	 :framebuffer_status complete
-	 :name name))
+	 :name name
+	 :gl_error (get_gl_error gl)))
      (catch Exception e 
        ;this is important, if an exception is thrown at a bad time
        ;then unless you release the fbo object your program will
@@ -180,9 +181,11 @@
       (when (context_renderbuffer_valid context_rb)
 	(release_opengl_framebffer_renderbuffer gl (context_rb :gl_handle))))
     (release_opengl_framebuffer_object gl (ctx_sface :gl_handle))
+    ;clear errors in case this was an invalid handle
     (struct-map context_surface
       :gl_handle 0
-      :attachments {})))
+      :attachments {}
+      :gl_error (get_gl_error gl))))
 
 (defn update_context_surface[log_data_ref gl ctx_sface newWidth newHeight]
   (delete_context_surface log_data_ref gl ctx_sface)
@@ -231,7 +234,6 @@
 (defn create_named_context_surface_seq[log_data_ref gl surfaces_ref sspec_seq name]
   (first (filter (fn [sspec]
 		   (create_named_context_surface log_data_ref gl surfaces_ref sspec name) ;create the object.  side effect alert.
-		   (. gl glGetError) ;clear out any gl errors
 		   (= ((@surfaces_ref name) :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)) ;if it is complete, then stop
 		 sspec_seq))
   (when (not (= ((@surfaces_ref name) :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT))

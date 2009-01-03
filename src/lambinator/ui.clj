@@ -9,10 +9,12 @@
 	   (java.awt.event ActionListener)
 	   (java.util.regex Pattern)
 	   (java.util.concurrent CountDownLatch)
+	   (java.util Timer TimerTask Date)
 	   (org.noos.xing.mydoggy ToolWindow ToolWindowAnchor ToolWindowManager)
 	   (org.noos.xing.mydoggy.plaf MyDoggyToolWindowManager)) ;forcing async to sync
   (:use lambinator.util lambinator.rcgl lambinator.log
-	clojure.contrib.seq-utils))
+	clojure.contrib.seq-utils
+	lambinator.fs))
 
 (load "ui_defs")
 
@@ -66,7 +68,8 @@
 	    gl_render_fn_ref
 	    (ref nil))))
 
-(defstruct ui_frame_data :frame :win_data :log_pane :inspector_pane :log_messages_ref :log_message_len)
+(defstruct ui_frame_data :frame :win_data :log_pane :inspector_pane :log_messages_ref :log_message_len
+	   :file_watcher_system )
 
 (defn init_tool_window_manager[]
   (let [window_mgr (MyDoggyToolWindowManager.)
@@ -90,7 +93,9 @@
      (fn [_]
        (try
 	(let [log_messages_ref (frame_data :log_messages_ref)
-	      args_str_lines (split_on_newline (apply stringify (concat (list module " " (name type) ": ") (flatten args))))
+	      args_str_lines (reverse (map (fn [line]
+					     (stringify module " " (name type) ": " line))
+					   (split_on_newline (apply stringify (flatten args)))))
 	      new_message_list (take (frame_data :log_message_len) (concat args_str_lines @log_messages_ref))
 	      builder (StringBuilder.)]
 	  (dosync (ref-set log_messages_ref new_message_list))
@@ -117,7 +122,14 @@
 	   logger_ref (@render_context_ref :logger_ref)
 	   bar (JMenuBar.)
 	   menu (JMenu. "About")
+	   file_mod_watcher_system (create_file_mod_watcher_system)
+	   #^TimerTask task (proxy [TimerTask] []
+				   (run 
+				    []
+				    (fs_mod_system_check_files file_mod_watcher_system)))
+	   filemod_timer (Timer.) 
 	   [window_mgr log_label inspector] (init_tool_window_manager)]
+       (. filemod_timer schedule task (Date.) (long 300))
        (.. frame getContentPane (setLayout (BorderLayout.)))
        (.. frame getContentPane (add window_mgr))
        (. (. window_mgr getContentManager) addContent "gl_panel" nil nil panel)
@@ -125,15 +137,18 @@
        (create_menu_item "OpenGL" (fn [ignored] (display_opengl_properties frame gl_system_strs_ref)) menu)
        (. frame setJMenuBar bar)
        (. frame setSize 1000 600)
+       
        (SwingUtilities/invokeLater 
 	(fn [] 
 	  (. (. window_mgr getToolWindow "Log") setActive true)
 	  (. (. window_mgr getToolWindow "Inspector") setActive true)
 	  (. frame setVisible true)))
-       (let [retval (struct ui_frame_data frame win_data log_label inspector (ref nil) 1000)]
+       (let [retval (struct ui_frame_data frame win_data log_label inspector (ref nil) 1000
+			    file_mod_watcher_system)]
 	 (dosync (ref-set logger_ref (log_add_listener @logger_ref 
 						       (fn [module type & args]
 							 (ui_add_log_message retval module type args)))))
+	 
 	 retval)))
   ([appName] (ui_create_app_frame appName nil)))
 

@@ -1,7 +1,8 @@
 (ns lambinator.util
   (:import (java.lang.reflect Modifier)
 	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)
-	   (java.util.regex Pattern))
+	   (java.util.regex Pattern)
+	   (java.io File))
   (:use clojure.contrib.except))
 
 (defn find_static_fields_by_value [cls_name val]
@@ -93,3 +94,12 @@
   (if str
     (re-seq (Pattern/compile "\\S+") str)
     nil))
+
+(defn run_cmd 
+  ([cmd_and_args_seq working_dir]
+     (let [working_dir (if working_dir
+			 working_dir
+			 (System/getProperty "user.dir"))]
+       (. (Runtime/getRuntime) exec (into-array String cmd_and_args_seq) nil (File. working_dir))))
+  ([cmd_and_args]
+     (run_cmd cmd_and_args nil)))

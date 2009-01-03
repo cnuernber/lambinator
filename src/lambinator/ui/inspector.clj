@@ -4,9 +4,10 @@
 			JScrollPane ScrollPaneConstants JTextField JTextPane
 			SwingUtilities JButton JPanel
 			JList JComboBox JSlider)
-	   (javax.swing.event ListSelectionListener ChangeListener)
+	   (javax.swing.event ListSelectionListener ChangeListener HyperlinkListener HyperlinkEvent$EventType)
 	   (java.awt.event ActionListener)
-	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension FlowLayout)))
+	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension FlowLayout)
+	   (javax.swing.text.html HTMLEditorKit)))
 
 ;name is the name to display
 ;editor is the component to use to edit the items
@@ -149,7 +150,27 @@
     (updater)
     (struct-map inspector_item :name name :editor panel :updater updater)
     ))
-    	
+
+;onclick takes no arguments.
+(defn create_read_only_hyperlink_inspector_item [name getter onclick]
+  (let [retval (JTextPane. )
+	value (getter)
+	updater (fn []
+		  (. retval setText (stringify "<html><a href=\"" value "\">" value "</a></html>")))
+	listener (proxy [Object HyperlinkListener][]
+		    (hyperlinkUpdate
+		     [event]
+		     (when (= (. event getEventType) HyperlinkEvent$EventType/ACTIVATED)
+		       (onclick))))]
+    (doto retval
+      (.setEditorKit (HTMLEditorKit. ))
+      (.setBorder nil)
+      (.setOpaque false)
+      (.setEditable false)
+      (.addHyperlinkListener listener))
+    (updater)
+    (struct-map inspector_item :name name :editor retval :updater updater)))
+      
 
 (defn setup_inspector_panel [inPanel inspector_item_seq]
   (. inPanel removeAll)
@@ -162,14 +183,14 @@
 			  gridx 0
 			  gridy index
 			  ipadx 0
-			  anchor GridBagConstraints/NORTHEAST
+			  anchor GridBagConstraints/EAST
 			  fill GridBagConstraints/NONE
 			  weightx 0.0)
       (add_with_constraints (item :editor) constraints inPanel
 			  gridx 1
 			  gridy index
 			  ipadx 0
-			  anchor GridBagConstraints/NORTHWEST
+			  anchor GridBagConstraints/WEST
 			  fill GridBagConstraints/HORIZONTAL
 			  weightx 1.0))
     (. inPanel setPreferredSize  (. inPanel getMinimumSize))))

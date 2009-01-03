@@ -21,6 +21,9 @@
       (. field getName)
       "")))
 
+(defn get_gl_error[gl]
+  (. gl glGetError))
+
 ;A lot of gl calls have the form of
 ;fn( int number, array ret_data, int offset )
 ;this wraps creating the retvals and such

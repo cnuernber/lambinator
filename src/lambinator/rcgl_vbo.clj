@@ -7,7 +7,7 @@
 ;gl supports two array types, ones for data and ones for index.
 (def vbo_types [:data :index])
 (def vbo_datatypes [:ubyte :ushort :float])
-(defstruct gl_vbo :gl_handle :name :type :generator :gl_datatype :item_count)
+(defstruct gl_vbo :gl_handle :name :type :generator :gl_datatype :item_count :gl_error)
 
 (defn gl_vbo_valid[vbo]
   (and vbo
@@ -46,7 +46,11 @@
 	      data_size (* item_count (item_size_from_clojure_type (first data_seq)))]
 	  (. gl glBindBuffer vbo_gl_type vbo_handle)
 	  (. gl glBufferData vbo_gl_type data_size data_buffer GL/GL_STATIC_DRAW )
-	  (assoc new_vbo :gl_handle vbo_handle :gl_datatype gl_datatype :item_count item_count)))
+	  (assoc new_vbo 
+	    :gl_handle vbo_handle 
+	    :gl_datatype gl_datatype 
+	    :item_count item_count 
+	    :gl_error (get_gl_error gl))))
       new_vbo)))
 
 (defn delete_gl_vbo[log_data_ref gl vbo]

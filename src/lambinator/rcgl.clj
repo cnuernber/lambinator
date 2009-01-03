@@ -38,8 +38,8 @@
 	  logger_ref :logger_ref } @render_context_ref
 	glslv (get_full_path glslv_filename)
 	glslf (get_full_path glslf_filename)]
-    (if (and (file_exists? glslv)
-	     (file_exists? glslf))
+    (if (and (file_or_resource_exists? glslv)
+	     (file_or_resource_exists? glslf))
       (do
 	(create_glsl_program_from_files logger_ref programs_ref shaders_ref loading_system render_tasks_ref glslv glslf prog_name )
 	true)
@@ -56,6 +56,25 @@
 (defn rcgl_set_glsl_uniforms[render_context gl var_pair_seq rcgl_glsl_program]
   (let [logger_ref (render_context :logger_ref)]
     (set_glsl_prog_uniforms logger_ref gl var_pair_seq rcgl_glsl_program)))
+
+(defn rcgl_associate_new_shader [render_context_ref prog_name old_shader_name new_shader_name]
+  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager } @render_context_ref
+	existing (@programs_ref prog_name)]
+    (when existing
+      (let [keyword (if (= ((existing :vert_shader) :filename) old_shader_name)
+		      :vert_shader
+		      (when (= ((existing :frag_shader) :filename) old_shader_name)
+			:frag_shader))]
+	(when keyword
+	  (dosync (alter programs_ref (fn [programs] (assoc programs prog_name 
+							    (assoc existing keyword
+								   (assoc (existing keyword) :filename new_shader_name)))))))))))
+
+(defn rcgl_load_shader [render_context_ref render_tasks_ref filename]
+  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager
+	  loading_system :loading_system
+	  logger_ref :logger_ref} @render_context_ref]
+    (begin_shader_load logger_ref programs_ref shaders_ref loading_system render_tasks_ref filename)))
 
 ;vbo type must be either :data or :index
 ;generator is a function that returns a sequence of numbers.  If they are float

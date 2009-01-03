@@ -8,13 +8,13 @@
 
 (def rcgl_glsl_shader_status [:valid :invalid :unused] )
 ;creates a hash of the shader text so we can identity different shaders
-(defstruct rcgl_glsl_shader :gl_handle :gl_log :filename :md5_hash :status ) ;either vertex or fragment
+(defstruct rcgl_glsl_shader :gl_handle :gl_log :filename :md5_hash :status :gl_error ) ;either vertex or fragment
 
 (def rcgl_glsl_program_status [:valid :loading :invalid :unused])
 
 (defstruct rcgl_glsl_program :vert_shader :frag_shader 
 	   :gl_handle :gl_log :name :uniforms :attributes
-	   :status ) ;combination of the two
+	   :status :gl_error ) ;combination of the two
 
 ;takes a filename and returns the gl constant that stands for the
 ;shader type.  This expects functions to end with glslv or glslf
@@ -91,7 +91,14 @@
 		     (. gl glDeleteShader shader)
 		     0)
 		   shader )]
-      (struct rcgl_glsl_shader shader log_str filename md5_hash shader_status))))
+      (struct-map rcgl_glsl_shader 
+	:gl_handle shader 
+	:gl_log log_str 
+	:filename filename 
+	:md5_hash md5_hash 
+	:status shader_status 
+	:gl_error (get_gl_error gl)))))
+
 
 (defn delete_glsl_shader[log_data_ref gl shader]
   (when (glsl_shader_valid shader)
@@ -106,7 +113,7 @@
 (defn test_create_glsl_shader_from_file [log_data_ref gl filename]
   (let [bytes (fs_load_file filename)
 	md5 (fs_md5_hash bytes)]
-    (create_glsl_shader log_data_ref gl bytes filename md5)))
+    (create_glsl_shader log_data_ref gl bytes filename md5 (list filename))))
 
 
 (defn create_invalid_glsl_program [glslv_filename glslf_filename prog_name]
@@ -160,16 +167,16 @@
       (if (== link_status GL/GL_TRUE) 
 	(let [attributes (glsl_get_program_items gl program GL/GL_ACTIVE_ATTRIBUTES GL/GL_ACTIVE_ATTRIBUTE_MAX_LENGTH glGetActiveAttrib)
 	      uniforms (glsl_get_program_items gl program GL/GL_ACTIVE_UNIFORMS GL/GL_ACTIVE_UNIFORM_MAX_LENGTH glGetActiveUniform)]
-	  (assoc retval :attributes attributes :uniforms uniforms :status :valid))
+	  (assoc retval :attributes attributes :uniforms uniforms :status :valid :gl_error (get_gl_error gl)))
 	(do
 	  (. gl glDeleteProgram program) ;clean up resources for failed compile
-	  (assoc retval :gl_handle 0))))))
+	  (assoc retval :gl_handle 0 :gl_error (get_gl_error gl)))))))
 
 (defn delete_glsl_program[log_data_ref gl program]
   (when (glsl_program_valid program)
     (rcgl_glsl_log log_data_ref :info "deleting program: " (program :name))
     (. gl glDeleteProgram (program :gl_handle))
-    (assoc program :gl_handle 0 :status :unused))) ;note that this says nothing about the shaders
+    (assoc program :gl_handle 0 :status :unused :gl_error (get_gl_error gl)))) ;note that this says nothing about the shaders
 
 (defmulti set_glsl_uniform (fn [log_data_ref gl uniform_entry var_value] (uniform_entry :datatype)))
 ;should log that nothing got set.
@@ -257,7 +264,7 @@
 		 program)] ;if the compiled prog isn't valid, return the original
     (when (and valid_pair (not compile_valid))
       (rcgl_glsl_log log_data_ref :diagnostic "Failed to compile program: " name)
-      (rcgl_glsl_log log_data_ref :diagnostic "gl log: " (compile_program :gl_log)))
+      (rcgl_glsl_log log_data_ref :diagnostic (compile_program :gl_log)))
     retval ))
 
 ;take the map of programs, and update every one that has a mismatched shader specification
@@ -290,7 +297,7 @@
 	    (update_programs log_data_ref gl programs_ref shaders_ref))
 	  (do
 	    (rcgl_glsl_log log_data_ref :diagnostic "Failed to compile shader: " filename)
-	    (rcgl_glsl_log log_data_ref :diagnostic "gl log: " (new_shader :gl_log))))))))
+	    (rcgl_glsl_log log_data_ref :diagnostic (new_shader :gl_log))))))))
 
 ;force a shader load of the given filename.
 ;then this completes, if the md5 hash is different it will rebuild
@@ -349,7 +356,7 @@
 (defn resources_released_reload_all_glsl_programs[log_data_ref drawable programs_ref shaders_ref]
   (let [gl (. drawable getGL)
 	new_shaders (doall (mapcat (fn [[name shader]]
-				     (let [bytes (fs_load_file name)
+				     (let [bytes (fs_load_item name)
 					   hash (fs_md5_hash bytes)]
 				       [name (create_glsl_shader log_data_ref gl bytes name hash)]))
 				   @shaders_ref))
