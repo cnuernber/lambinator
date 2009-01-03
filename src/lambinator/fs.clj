@@ -92,7 +92,7 @@
      actions)))
 
 ;Adds an action.  Returns the existing entry before adding new actions
-(defn add_filename_action [actions_map_ref filename action]
+(defn- add_filename_action [actions_map_ref filename action]
   (dosync
    (let [actions @actions_map_ref
 	 existing (actions filename)
@@ -221,15 +221,27 @@
 	      (fn [fname_watchers]
 		(apply assoc fname_watchers new_entries_expanded)))))))
 
+(defn split_fname_into_name_ending[fname]
+  (if fname
+    (let [lindex (. fname lastIndexOf ".")]
+      (if (and (>= lindex 0) 
+	       (< lindex (. fname length)))
+	[(. fname substring (int 0) (int lindex)) (. fname substring (int lindex))]
+	[fname ""]))
+    ["" ""]))
 
 ;returns a java.io.file
 (defn fs_get_temp_file [fname]
   (let [temp_dir (System/getProperty "java.io.tmpdir")
-	temp_fname (. (File. fname) getName)]
-    (first (filter (fn [file]
-		     (not (. file exists)))
-		   (map (fn [index] (File. temp_dir (stringify index temp_fname)))
-			(iterate inc 0))))))
+	temp_fname (. (File. fname) getName)
+	[temp_stem temp_ending] (split_fname_into_name_ending temp_fname)
+	current_file (File. temp_dir temp_fname)]
+    (if (. current_file exists)
+      (first (filter (fn [file]
+		       (not (. file exists)))
+		     (map (fn [index] (File. temp_dir (stringify temp_stem index temp_ending)))
+			  (iterate inc 0))))
+      current_file)))
     
 ;http://www.rgagnon.com/javadetails/java-0064.html
 (defn fs_copy_stream_to_file [input_stream fname]

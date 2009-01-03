@@ -1,3 +1,5 @@
+(. (System/getProperties) setProperty 
+   "com.apple.mrj.application.apple.menu.about.name" "Wave Demo")
 (ns lambinator.demo.wave
   (:use lambinator.ui lambinator.rcgl lambinator.rc
 	clojure.contrib.seq-utils lambinator.util
@@ -6,7 +8,8 @@
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)
-	  (java.util Timer)))
+	  (java.util Timer))
+  (:gen-class))
 
 (defn with_context_and_tasks_refs[wave_demo_data_ref lambda]
   (let [fm (@wave_demo_data_ref :frame)
@@ -464,7 +467,7 @@
     (run_cmd ["open" edited])))
 
 (defn create_wave_demo[]
-  (let [frame (ui_create_app_frame "wave demo")
+  (let [frame (ui_create_app_frame "Wave Demo")
 	retval (ref (struct-map wave_demo_data
 		      :frame frame
 		      :wave_freq 1.0
@@ -530,3 +533,8 @@
     (reset_wave_demo retval)
     (. (frame :frame) setVisible true)
     retval))
+
+(defn- -main [& args]
+  (let [demo_data (create_wave_demo)]
+    ;if we run from the cmd line, then exist at close
+    (ui_add_hook (@demo_data :frame) :close_hooks_ref #(System/exit 0))))

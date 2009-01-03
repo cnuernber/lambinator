@@ -59,6 +59,7 @@
       <fileset dir="${build}" includes="**/*.class"/>
       <fileset dir="${src}" includes="data/**/*.*"/>
       <manifest>
+        <attribute name="Main-Class" value="lambinator.demo.wave"/>
         <attribute name="Class-Path" value="."/>
       </manifest>
     </jar>
