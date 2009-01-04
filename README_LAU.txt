@@ -12,6 +12,15 @@ type: ./run_wave_demo.
 It setups up the java classpath as follows:
 -cp $CLASSPATH:lambinator.jar:lib-jars:.
 
+http://berger-files.blogspot.com/2009/01/first-clojure-project.html
+
+Finally, when you click on a shader, on a mac, you will have a text
+editor open up and you can edit the code.  If that doesn't happen
+you can still edit the file!  Look at the log, it will tell you where
+it created the temp file.  Open that file with any editor you want
+and play with the two shaders as much as you want!
+
+
 Let me know how it goes...  
 cnuernber@gmail.com
 

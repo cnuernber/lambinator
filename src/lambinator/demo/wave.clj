@@ -543,5 +543,4 @@
 
 (defn- -main [& args]
   (let [demo_data (create_wave_demo)]
-    ;if we run from the cmd line, then exist at close
-    (ui_add_hook (@demo_data :frame) :close_hooks_ref #(System/exit 0))))
+    (SwingUtilities/invokeLater #(ui_add_hook (@demo_data :frame) :close_hooks_ref (fn [] (System/exit 0))))))

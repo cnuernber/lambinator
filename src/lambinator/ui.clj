@@ -319,5 +319,3 @@
   (let [{ { panel :gl_win } :win_data } frame_data
 	dims (. panel getSize)]
     (. panel repaint 0 0 (.width dims) (.height dims))))
-  
-    
