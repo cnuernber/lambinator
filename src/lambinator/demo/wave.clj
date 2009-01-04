@@ -8,7 +8,8 @@
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)
-	  (java.util Timer))
+	  (java.util Timer)
+	  (javax.swing SwingUtilities))
   (:gen-class))
 
 (defn with_context_and_tasks_refs[wave_demo_data_ref lambda]
@@ -466,15 +467,15 @@
   (let [edited (@wave_demo_ref keyword)]
     (run_cmd ["open" edited])))
 
-(defn create_wave_demo[]
+;this has to run from the swing event thread.
+(defn do_create_wave_demo[retval]
+  (dosync (ref-set retval (struct-map wave_demo_data
+			    :wave_freq 1.0
+			    :wave_width 0.1
+			    :wave_height 3.0
+			    :num_samples :4
+			    :geom_type :vbo)))
   (let [frame (ui_create_app_frame "Wave Demo")
-	retval (ref (struct-map wave_demo_data
-		      :frame frame
-		      :wave_freq 1.0
-		      :wave_width 0.1
-		      :wave_height 3.0
-		      :num_samples :4
-		      :geom_type :vbo))
 	aa_item (create_list_inspector_item 
 		 "Antialiasing: " ;item name
 		 aa_choices_array ;choices
@@ -527,11 +528,17 @@
 		    (fn [] "/data/glsl/wave.glslf")
 		    #(handle_wave_glsl_edit retval :glslf_edited "/data/glsl/wave.glslf"))
 	inspector_items [aa_item geom_item freq_item width_item height_item glslv_item glslf_item]]
-    (dosync (ref-set retval (assoc @retval :inspector_items inspector_items)))
+    (dosync (ref-set retval (assoc @retval :inspector_items inspector_items :frame frame)))
     (ui_add_hook frame :close_hooks_ref #(disable_wave_demo retval))
     (demo_setup_inspector_panel retval)
     (reset_wave_demo retval)
     (. (frame :frame) setVisible true)
+    retval))
+
+
+(defn create_wave_demo[]
+  (let [retval (ref nil)]
+    (SwingUtilities/invokeLater #(do_create_wave_demo retval))
     retval))
 
 (defn- -main [& args]

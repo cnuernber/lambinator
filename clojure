@@ -1,17 +1,12 @@
 #!/bin/sh -e 
-#/System/Library/Frameworks/JavaVM.framework/Versions/1.6.0/Commands/
-/System/Library/Frameworks/JavaVM.framework/Versions/1.6.0/Commands/java \
+java \
  -Dsun.java2d.opengl=true -Dsun.java2d.opengl.fbobject=true -cp \
-/Users/chrisn/dev/clojure/trunk/clojure.jar:\
-/Users/chrisn/dev/clojure-contrib/trunk/clojure-contrib.jar:\
+$CLASSPATH:\
 /Users/chrisn/dev/editor/lambinator/lambinator.jar:\
-/Users/chrisn/dev/jogl-1.1.1-macosx-universal/lib/jogl.jar:\
-/Users/chrisn/dev/jogl-1.1.1-macosx-universal/lib/gluegen-rt.jar:\
 /Users/chrisn/dev/mydoggy-1/lib/mydoggy-api-1.4.2.jar:\
 /Users/chrisn/dev/mydoggy-1/lib/mydoggy-plaf-1.4.2.jar:\
 /Users/chrisn/dev/mydoggy-1/lib/TableLayout-20050920.jar:\
 /Users/chrisn/dev/mydoggy-1/lib/mydoggy-res-1.4.2.jar:\
- -Djava.library.path=/Users/chrisn/dev/jogl-1.1.1-macosx-universal/lib/\
  -Dcom.apple.eawt.CocoaComponent.CompatibilityMode=false\
  -Dsun.java2d.opengl=true\
  -Dsun.java2d.opengl.fbobject=true\
