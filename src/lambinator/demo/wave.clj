@@ -465,7 +465,7 @@
 					   new-temp-fname))))))))
   
   (let [edited (@wave-demo-ref keyword)]
-    (run-cmd ["open" edited])))
+    (util-run-cmd ["open" edited])))
 
 ;this has to run from the swing event thread.
 (defn do-create-wave-demo[retval]
@@ -486,7 +486,7 @@
 		 (fn [item]
 		   (if (= item :none)
 		     "none"
-		     (stringify (name item) "x"))))
+		     (util-stringify (name item) "x"))))
 	geom-item (create-list-inspector-item
 		   "Geom Render Mode: " ;name
 		   geom-choices-array   ;options 

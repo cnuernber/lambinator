@@ -31,19 +31,5 @@
   (let [tex-handle (context-texture :gl-handle)]
     (release-opengl-texture-handle gl tex-handle)
     (create-context-texture (context-texture :texture-spec) -1)))
-
-;A context texture is empty if its gl handle <= 0
-(defn find-empty-context-texture[textures]
-  (util-find-next-matching-index textures
-				 #(<= 0 (% :gl-handle)) (fn [] nil)))
-
-(defn allocate-context-texture-item[gl textures texture-spec]
-  (let [[index textures] (find-empty-context-texture textures)
-	context-texture (allocate-opengl-texture gl texture-spec)]
-    [(assoc textures index context-texture) index]))
-
-(defn release-context-texture-item[gl textures index]
-  (let [context-texture (textures index)]
-    (assoc textures index (release-opengl-texture gl context-texture))))
     
   

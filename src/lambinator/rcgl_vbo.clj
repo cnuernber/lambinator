@@ -33,7 +33,7 @@
 
 ;datatype is one of the rc datatypes, ubyte ushort or float 
 (defn create-gl-vbo [log-data-ref gl name vbo-type data-seq generator]
-  (let [data-buffer (make-nio-buffer data-seq)
+  (let [data-buffer (util-make-nio-buffer data-seq)
 	new-vbo (struct gl-vbo 0 name vbo-type generator)]
     (if data-buffer
       (do

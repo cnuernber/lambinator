@@ -36,10 +36,10 @@
   (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager
 	  loading-system :loading-system 
 	  logger-ref :logger-ref } @render-context-ref
-	glslv (get-full-path glslv-filename)
-	glslf (get-full-path glslf-filename)]
-    (if (and (file-or-resource-exists? glslv)
-	     (file-or-resource-exists? glslf))
+	glslv (fs-get-full-path glslv-filename)
+	glslf (fs-get-full-path glslf-filename)]
+    (if (and (fs-file-or-resource-exists? glslv)
+	     (fs-file-or-resource-exists? glslf))
       (do
 	(create-glsl-program-from-files logger-ref programs-ref shaders-ref loading-system render-tasks-ref glslv glslf prog-name )
 	true)

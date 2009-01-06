@@ -91,8 +91,8 @@
        (try
 	(let [log-messages-ref (frame-data :log-messages-ref)
 	      args-str-lines (reverse (map (fn [line]
-					     (stringify module " " (name type) ": " line))
-					   (split-on-newline (apply stringify (flatten args)))))
+					     (util-stringify module " " (name type) ": " line))
+					   (util-split-on-newline (apply util-stringify (flatten args)))))
 	      new-message-list (take @(frame-data :log-length-ref) (concat args-str-lines @log-messages-ref))]
 	  (dosync (ref-set log-messages-ref new-message-list))
 	  nil)

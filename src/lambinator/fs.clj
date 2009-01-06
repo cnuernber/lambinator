@@ -21,31 +21,49 @@
 ;maps filename to list of actions to take when in memory.
 ;these actions happen in an agent thread sent off using
 ;'send'
-(defn create-loading-system[]
+(defn create-loading-system
+  "Create an empty loading system.  The loading system maps
+filenames to items waiting for their load completion"
+  []
   (struct loading-system (ref {})))
 
 
-(defn fs-get-resource-stream[fname]
+(defn fs-get-resource-stream
+  "Return the resource stream associated with this filename"
+  [fname]
   (. (Class/forName "lambinator.fs__init") getResourceAsStream fname))
 
-(defn resource-file-exists? [fname]
+(defn fs-resource-file-exists? 
+  "Determine whether a given resource exists"
+  [fname]
   (not (nil? (fs-get-resource-stream fname))))
 
-(defn get-full-path[fname]
-  (if (resource-file-exists? fname)
+(defn fs-get-full-path
+  "Return the full path if the item is a file.  This function is currently not
+correct as it does not return the fully qualified name in the case the 
+input name refers to a resource file"
+  [fname]
+  (if (fs-resource-file-exists? fname)
     fname
     (. (File. fname) getCanonicalPath)))
 
-(defn file-exists?[fname]
+(defn fs-file-exists?
+  "Return true if the file exists on the filesystem"
+  [fname]
   (. (File. fname) exists))
 
-(defn file-or-resource-exists? [fname]
-  (or (file-exists? fname)
-      (resource-file-exists? fname)))
+(defn fs-file-or-resource-exists? 
+  "Return true if the file or the resource exist"
+  [fname]
+  (or (fs-file-exists? fname)
+      (fs-resource-file-exists? fname)))
 
 
 
-(defn fs-get-item-input-stream[fname]
+(defn fs-get-item-input-stream
+  "Get an input stream that corresponds to this item.  The stream
+could either be a file input stream or a resource input stream"
+  [fname]
   (let [rsrc-stream (fs-get-resource-stream fname)]
     (if rsrc-stream
       rsrc-stream
@@ -53,7 +71,9 @@
 
 ;attempts to load a file, producing a byte buffer
 ;You should have ensured it existed
-(defn fs-load-file [fname]
+(defn fs-load-file 
+  "Load a file completely into memory and return the bytes"
+  [fname]
   (let [file (File. fname)
 	input (FileInputStream. file)
 	len (. file length)
@@ -62,31 +82,41 @@
     bytes))
 	
 
-(defn fs-load-resource [fname]
+(defn fs-load-resource 
+  "Load a resource stream completely into memory and return
+the bytes.  This will *really* only work for resource streams"
+  [fname]
   (let [stream (fs-get-resource-stream fname)
 	length (. stream available)
 	retval (make-array Byte/TYPE length)]
     (. stream read retval)
     retval))
 
-(defn fs-load-item [fname]
-  (if (resource-file-exists? fname)
+(defn fs-load-item 
+  "Load an item, whether it is a file or resource.  This function
+gives resources priority"
+  [fname]
+  (if (fs-resource-file-exists? fname)
     (fs-load-resource fname)
     (fs-load-file fname)))
 
-(defn fs-to-hex [bytes]
+(defn fs-to-hex 
+  "Take a byte buffer and return a signed hexadecimal
+representation of said buffer"
+  [bytes]
   (let [integer (BigInteger. bytes)]
     (. integer toString 16)))
       
 
-(defn fs-md5-hash [bytes]
+(defn fs-md5-hash 
+"Take a byte buffer and return an  md5 hash as another byte buffer"
+[bytes]
   (let [digest (MessageDigest/getInstance "md5")]
     (. digest update bytes)
     (fs-to-hex (. digest digest))))
 
-;Gets the list of actions and removes the filename
-;from the map.
-(defn get-filename-actions[actions-map-ref filename]
+
+(defn- get-filename-actions[actions-map-ref filename]
   (dosync
    (let [actions-map @actions-map-ref
 	 actions (actions-map filename)]
@@ -103,16 +133,21 @@
      existing)))
        
 
-(defn fs-thread-md5[actions-map-ref filename bytes]
-  ;(println "md5ing in" (lambinator.util/current-thread-id))
+(defn- fs-thread-md5
+  "Given a filename and buffer, launch a thread on the CPU thread pool
+that creates an md5 hash and then calls the listeners for a given
+filename"
+  [actions-map-ref filename bytes]
   (let [md5-hash (fs-md5-hash bytes)
 	actions (get-filename-actions actions-map-ref filename)
 	actions-agent (agent [])]
     (doseq [action actions]
       (send actions-agent (fn [agent] (action bytes filename md5-hash) nil)))))
 
-(defn fs-thread-load[actions-map-ref filename]
-  ;(println "loading in" (lambinator.util/current-thread-id))
+(defn- fs-thread-load
+  "Load a filename on the IO thread pool, then pass file
+to CPU thread pool for md5 and final processing"
+  [actions-map-ref filename]
   (let [bytes (fs-load-item filename)
 	md5-agent (agent [])]
     (send md5-agent 
@@ -124,10 +159,17 @@
 ;off a new loading process.  Returns true if the file
 ;existed in disk and thus this task happens.
 ;false if the file didn't exist.
-(defn fs-add-load-task[loading-system fname task]
-  (let [full-file-name (get-full-path fname)
+(defn fs-add-load-task
+  "Add a given task to be done when a given file is finished loading.
+The task should take three arguments, a byte array, a filename, and an 
+md5 hash of the file's contents.  This function will probably be
+modified such that in the future, you pass in a pair of tasks;
+one for if the load is successful and another when there is an
+error during load"
+  [loading-system fname task]
+  (let [full-file-name (fs-get-full-path fname)
 	actions-map-ref (loading-system :file-actions)
-	exists (file-or-resource-exists? fname)]
+	exists (fs-file-or-resource-exists? fname)]
     (if exists 
       (let [existing (add-filename-action actions-map-ref full-file-name task)]
 	(when (not existing)
@@ -136,7 +178,9 @@
 	true )
       false)))
 
-(defn fs-get-file-mod-time [fname]
+(defn fs-get-file-mod-time 
+  "Given a file name return the last modified time for that file"
+  [fname]
   (let [file (File. fname)]
     (if (. file exists) 
       (. file lastModified)
@@ -148,7 +192,8 @@
 ;no mod time is fine; a new one will be inserted
 ;and marked as changed.
 ;a file that doesn't exist gets a nil mod time
-(defn check-file-modifications[file-mod-seq]
+(defn- check-file-modifications  
+  [file-mod-seq]
   (map (fn [[fname mod-time]]
 	 (let [new-mod-time (fs-get-file-mod-time fname)]
 	   [fname new-mod-time (not(= mod-time new-mod-time))]))
@@ -161,7 +206,7 @@
 (defstruct file-mod-watcher-system :file-watchers-ref)
 (defn create-file-mod-watcher-system [] (struct file-mod-watcher-system (ref {})))
 
-(defn internal-add-file-mod-watcher [file-watchers fname watcher-name watcher]
+(defn- internal-add-file-mod-watcher [file-watchers fname watcher-name watcher]
   (let [existing (file-watchers fname)
 	existing (if existing
 		   existing
@@ -173,12 +218,17 @@
 	   (assoc existing :watchers
 		  (assoc (existing :watchers) watcher-name watcher)))))
 
-(defn fs-add-file-mod-watcher [fs-watcher-system fname watcher-name watcher]
+(defn fs-add-file-mod-watcher 
+  "Add a new object to be notified when a particular file changes.  The objects are named
+so you can find and remove the watcher if you desire.
+The watcher is a function that takes a single argument; the filename to watch"
+  [fs-watcher-system fname watcher-name watcher]
   (let [file-watchers-ref (fs-watcher-system :file-watchers-ref)]
     (dosync 
      (alter file-watchers-ref internal-add-file-mod-watcher fname watcher-name watcher))))
 
-(defn interal-remove-file-mod-watcher [watchers fname watcher-name]
+(defn- interal-remove-file-mod-watcher 
+  [watchers fname watcher-name]
   (let [existing (watchers fname)
 	existing-entries (if existing
 			   (existing :watchers)
@@ -194,13 +244,18 @@
       (dissoc watchers fname))))
     
 
-(defn fs-remove-file-mod-watcher [fs-watcher-system fname watcher-name]
+(defn fs-remove-file-mod-watcher 
+  "Remove the file modification watcher from the watchers list for a particular file"
+  [fs-watcher-system fname watcher-name]
   (let [file-watchers-ref (fs-watcher-system :file-watchers-ref)]
     (dosync 
      (alter file-watchers-ref interal-remove-file-mod-watcher fname watcher-name))))
     
 
-(defn fs-mod-system-check-files [fs-watcher-system]
+(defn fs-mod-system-check-files 
+  "Check registered files and call the relevant watchers with the name
+of the file that has changed"
+  [fs-watcher-system]
   (let [current-watchers @(fs-watcher-system :file-watchers-ref)
 	filemod-seq (map (fn [[fname entry]]
 			   [fname (entry :mod-time)])
@@ -223,7 +278,7 @@
 	      (fn [fname-watchers]
 		(apply assoc fname-watchers new-entries-expanded)))))))
 
-(defn split-fname-into-name-ending[fname]
+(defn- split-fname-into-name-ending[fname]
   (if fname
     (let [lindex (. fname lastIndexOf ".")]
       (if (and (>= lindex 0) 
@@ -233,7 +288,10 @@
     ["" ""]))
 
 ;returns a java.io.file
-(defn fs-get-temp-file [fname]
+(defn fs-get-temp-file 
+  "Given a filename (which can be a full path), return a temp file
+that bears at least some resemblence to the requested file name"
+  [fname]
   (let [temp-dir (System/getProperty "java.io.tmpdir")
 	temp-fname (. (File. fname) getName)
 	[temp-stem temp-ending] (split-fname-into-name-ending temp-fname)
@@ -241,12 +299,14 @@
     (if (. current-file exists)
       (first (filter (fn [file]
 		       (not (. file exists)))
-		     (map (fn [index] (File. temp-dir (stringify temp-stem index temp-ending)))
+		     (map (fn [index] (File. temp-dir (util-stringify temp-stem index temp-ending)))
 			  (iterate inc 0))))
       current-file)))
     
 ;http://www.rgagnon.com/javadetails/java-0064.html
-(defn fs-copy-stream-to-file [input-stream fname]
+(defn fs-copy-stream-to-file 
+  "Given an input stream, copy its contents to the given filename"
+  [input-stream fname]
   (with-open [output-stream (FileOutputStream. fname)]
     (if (isa? FileInputStream input-stream)
       (let [in-channel (. input-stream getChannel)
@@ -274,7 +334,10 @@
 				   (iterate read-fn (read-fn [0 0])))]
 	((last iterations) 1)))))
 
-(defn fs-copy-item-stream-to-file [ifname ofname]
+(defn fs-copy-item-stream-to-file 
+  "Given an item that could be either a resource *or* a file, copy its
+contents to the given filename"
+  [ifname ofname]
   (with-open [input-stream (fs-get-item-input-stream ifname)]
     (fs-copy-stream-to-file input-stream ofname)))
     

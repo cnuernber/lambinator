@@ -116,13 +116,13 @@
 ;create a depth renderbuffer specifying the bits from the above array
 ;and whether to use a texture
 (defmethod create-renderbuffer :depth [type depth-bits use-texture] 
-  (throw-if-item-missing depth-bits surface-depth-bits "depth-bits must be a surface-depth-bits: " depth-bits)
+  (util-throw-if-item-missing depth-bits surface-depth-bits "depth-bits must be a surface-depth-bits: " depth-bits)
   (struct-map renderbuffer-data :type type :depth-bits depth-bits :use-texture use-texture))
 
 ;Create a color renderbuffer 
 (defmethod create-renderbuffer :color [type datatype format use-texture]
-  (throw-if-item-missing datatype rc-datatypes "datatype must be an rc datatype: " datatype)
-  (throw-if-item-missing format rc-formats "format must be an rc format: " format)
+  (util-throw-if-item-missing datatype rc-datatypes "datatype must be an rc datatype: " datatype)
+  (util-throw-if-item-missing format rc-formats "format must be an rc format: " format)
   (struct-map renderbuffer-data 
     :type type ;color
     :color-datatype datatype ;datatype of the color buffer
@@ -143,7 +143,7 @@
 (defn create-surface-spec 
   ([attachments width height multi-sample] 
      (when multi-sample
-       (throw-if-item-missing multi-sample 
+       (util-throw-if-item-missing multi-sample 
 			      multisample-num-samples 
 			      "datatype must be multisample-num-samples: " multi-sample))
      (struct-map surface-spec 

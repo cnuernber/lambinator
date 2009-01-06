@@ -31,7 +31,7 @@
     (let [newStrs (reduce 
 		   #(assoc %1 %2 
 			   (. gl glGetString 
-			      (get-static-field-value "javax.media.opengl.GL" %2))) 
+			      (util-get-static-field-value "javax.media.opengl.GL" %2))) 
 		   sys-strs keys)]
       (dosync (ref-set gl-system-strs-ref newStrs)))))
 
@@ -121,42 +121,42 @@
 	constraints (GridBagConstraints.) ]
     (. dlg setLayout (GridBagLayout.))
     (sets! constraints ipadx 1 ipady 1)
-    (add-with-constraints (create-label "Version") constraints dlg
+    (util-add-with-constraints (create-label "Version") constraints dlg
 			  gridx 0
 			  gridy 0
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add-with-constraints (create-label (get-gl-system-property "GL_VERSION" gl-system-strs-ref)) constraints dlg
+    (util-add-with-constraints (create-label (get-gl-system-property "GL_VERSION" gl-system-strs-ref)) constraints dlg
 			  gridx 1
 			  gridy 0
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add-with-constraints (create-label "Vendor") constraints dlg
+    (util-add-with-constraints (create-label "Vendor") constraints dlg
 			  gridx 0
 			  gridy 1
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add-with-constraints (create-label (get-gl-system-property "GL_VENDOR" gl-system-strs-ref)) constraints dlg
+    (util-add-with-constraints (create-label (get-gl-system-property "GL_VENDOR" gl-system-strs-ref)) constraints dlg
 			  gridx 1
 			  gridy 1
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add-with-constraints (create-label "Renderer") constraints dlg
+    (util-add-with-constraints (create-label "Renderer") constraints dlg
 			  gridx 0
 			  gridy 2
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add-with-constraints (create-label (get-gl-system-property "GL_RENDERER" gl-system-strs-ref)) constraints dlg
+    (util-add-with-constraints (create-label (get-gl-system-property "GL_RENDERER" gl-system-strs-ref)) constraints dlg
 			  gridx 1
 			  gridy 2
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add-with-constraints (create-label "Extensions" ) constraints dlg
+    (util-add-with-constraints (create-label "Extensions" ) constraints dlg
 			  gridx 0
 			  gridy 3
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add-with-constraints (create-scrollable-extensions-label gl-system-strs-ref) constraints dlg
+    (util-add-with-constraints (create-scrollable-extensions-label gl-system-strs-ref) constraints dlg
 			  gridx 1
 			  gridy 3
 			  weightx 1.0

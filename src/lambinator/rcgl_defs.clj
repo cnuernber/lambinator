@@ -16,7 +16,7 @@
   ((all-surfaces idx) :surface-spec))
 
 (defn get-opengl-constant-name [constant]
-  (let [field (first (find-static-fields-by-value "javax.media.opengl.GL" constant))]
+  (let [field (first (util-find-static-fields-by-value "javax.media.opengl.GL" constant))]
     (if field
       (. field getName)
       "")))

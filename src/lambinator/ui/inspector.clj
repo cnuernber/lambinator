@@ -135,13 +135,13 @@
     (. input-box addActionListener text-listener)
     (. slider addChangeListener slider-listener)
     (. panel setLayout layout)
-    (add-with-constraints slider constraints panel
+    (util-add-with-constraints slider constraints panel
 			  gridx 0
 			  gridy 0
 			  anchor GridBagConstraints/WEST
 			  fill GridBagConstraints/HORIZONTAL
 			  weightx 1.0)
-    (add-with-constraints input-box constraints panel
+    (util-add-with-constraints input-box constraints panel
 			  gridx 1
 			  gridy 0
 			  anchor GridBagConstraints/EAST
@@ -156,7 +156,7 @@
   (let [retval (JTextPane. )
 	value (getter)
 	updater (fn []
-		  (. retval setText (stringify "<html><a href=\"" value "\">" value "</a></html>")))
+		  (. retval setText (util-stringify "<html><a href=\"" value "\">" value "</a></html>")))
 	listener (proxy [Object HyperlinkListener][]
 		    (hyperlinkUpdate
 		     [event]
@@ -179,19 +179,19 @@
     (. inPanel setLayout (GridBagLayout.))
     (sets! constraints ipadx 1 ipady 1)
     (doseq [[index item] (map vector (iterate inc 0) inspector-item-seq)]
-      (add-with-constraints (JLabel. (item :name)) constraints inPanel
-			  gridx 0
-			  gridy index
-			  ipadx 0
-			  anchor GridBagConstraints/EAST
-			  fill GridBagConstraints/NONE
-			  weightx 0.0)
-      (add-with-constraints (item :editor) constraints inPanel
-			  gridx 1
-			  gridy index
-			  ipadx 0
-			  anchor GridBagConstraints/WEST
-			  fill GridBagConstraints/HORIZONTAL
-			  weightx 1.0))
+      (util-add-with-constraints (JLabel. (item :name)) constraints inPanel
+				 gridx 0
+				 gridy index
+				 ipadx 0
+				 anchor GridBagConstraints/EAST
+				 fill GridBagConstraints/NONE
+				 weightx 0.0)
+      (util-add-with-constraints (item :editor) constraints inPanel
+				 gridx 1
+				 gridy index
+				 ipadx 0
+				 anchor GridBagConstraints/WEST
+				 fill GridBagConstraints/HORIZONTAL
+				 weightx 1.0))
     (. inPanel setPreferredSize  (. inPanel getMinimumSize))))
       
