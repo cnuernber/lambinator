@@ -12,101 +12,101 @@
 (load "rcgl_glsl")
 (load "rcgl_vbo")
 
-(defstruct render_context  
-  :glsl_manager 
-  :loading_system
-  :vbo_manager
-  :surfaces_ref
-  :logger_ref)
+(defstruct render-context  
+  :glsl-manager 
+  :loading-system
+  :vbo-manager
+  :surfaces-ref
+  :logger-ref)
 
-(defn create_render_context [logger_ref]
-  (struct render_context 
-	  (create_rcgl_glsl_manager)
-	  (create_loading_system)
-	  (create_vbo_manager)
+(defn create-render-context [logger-ref]
+  (struct render-context 
+	  (create-rcgl-glsl-manager)
+	  (create-loading-system)
+	  (create-vbo-manager)
 	  (ref {})
-	  logger_ref))
+	  logger-ref))
     
 ;OK to call outside render thread.  You can find the program
 ;via the name you passed in later.
 ;returns true if both files exist
 ;false if one of them does not.
 ;this takes the ref because it is a public, outside render thread function.
-(defn rcgl_create_glsl_program[render_context_ref render_tasks_ref glslv_filename glslf_filename prog_name]
-  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager
-	  loading_system :loading_system 
-	  logger_ref :logger_ref } @render_context_ref
-	glslv (get_full_path glslv_filename)
-	glslf (get_full_path glslf_filename)]
-    (if (and (file_or_resource_exists? glslv)
-	     (file_or_resource_exists? glslf))
+(defn rcgl-create-glsl-program[render-context-ref render-tasks-ref glslv-filename glslf-filename prog-name]
+  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager
+	  loading-system :loading-system 
+	  logger-ref :logger-ref } @render-context-ref
+	glslv (get-full-path glslv-filename)
+	glslf (get-full-path glslf-filename)]
+    (if (and (file-or-resource-exists? glslv)
+	     (file-or-resource-exists? glslf))
       (do
-	(create_glsl_program_from_files logger_ref programs_ref shaders_ref loading_system render_tasks_ref glslv glslf prog_name )
+	(create-glsl-program-from-files logger-ref programs-ref shaders-ref loading-system render-tasks-ref glslv glslf prog-name )
 	true)
       false)))
 
-(defn append_to_ref_list [render_tasks_ref lmbda]
-  (dosync (ref-set render_tasks_ref (conj @render_tasks_ref lmbda))))
+(defn append-to-ref-list [render-tasks-ref lmbda]
+  (dosync (ref-set render-tasks-ref (conj @render-tasks-ref lmbda))))
 
-(defn rcgl_delete_glsl_program[render_context_ref render_tasks_ref prog_name]
-  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager 
-	  logger_ref :logger_ref } @render_context_ref]
-    (append_to_ref_list render_tasks_ref #(delete_rcgl_glsl_program_and_shaders logger_ref % programs_ref shaders_ref prog_name))))
+(defn rcgl-delete-glsl-program[render-context-ref render-tasks-ref prog-name]
+  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager 
+	  logger-ref :logger-ref } @render-context-ref]
+    (append-to-ref-list render-tasks-ref #(delete-rcgl-glsl-program-and-shaders logger-ref % programs-ref shaders-ref prog-name))))
 
-(defn rcgl_set_glsl_uniforms[render_context gl var_pair_seq rcgl_glsl_program]
-  (let [logger_ref (render_context :logger_ref)]
-    (set_glsl_prog_uniforms logger_ref gl var_pair_seq rcgl_glsl_program)))
+(defn rcgl-set-glsl-uniforms[render-context gl var-pair-seq rcgl-glsl-program]
+  (let [logger-ref (render-context :logger-ref)]
+    (set-glsl-prog-uniforms logger-ref gl var-pair-seq rcgl-glsl-program)))
 
-(defn rcgl_associate_new_shader [render_context_ref prog_name old_shader_name new_shader_name]
-  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager } @render_context_ref
-	existing (@programs_ref prog_name)]
+(defn rcgl-associate-new-shader [render-context-ref prog-name old-shader-name new-shader-name]
+  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager } @render-context-ref
+	existing (@programs-ref prog-name)]
     (when existing
-      (let [keyword (if (= ((existing :vert_shader) :filename) old_shader_name)
-		      :vert_shader
-		      (when (= ((existing :frag_shader) :filename) old_shader_name)
-			:frag_shader))]
+      (let [keyword (if (= ((existing :vert-shader) :filename) old-shader-name)
+		      :vert-shader
+		      (when (= ((existing :frag-shader) :filename) old-shader-name)
+			:frag-shader))]
 	(when keyword
-	  (dosync (alter programs_ref (fn [programs] (assoc programs prog_name 
+	  (dosync (alter programs-ref (fn [programs] (assoc programs prog-name 
 							    (assoc existing keyword
-								   (assoc (existing keyword) :filename new_shader_name)))))))))))
+								   (assoc (existing keyword) :filename new-shader-name)))))))))))
 
-(defn rcgl_load_shader [render_context_ref render_tasks_ref filename]
-  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager
-	  loading_system :loading_system
-	  logger_ref :logger_ref} @render_context_ref]
-    (begin_shader_load logger_ref programs_ref shaders_ref loading_system render_tasks_ref filename)))
+(defn rcgl-load-shader [render-context-ref render-tasks-ref filename]
+  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager
+	  loading-system :loading-system
+	  logger-ref :logger-ref} @render-context-ref]
+    (begin-shader-load logger-ref programs-ref shaders-ref loading-system render-tasks-ref filename)))
 
 ;vbo type must be either :data or :index
 ;generator is a function that returns a sequence of numbers.  If they are float
 ;then you get a float buffer.  If they are bytes, then you get a byte buffer.
 ;Finally, if they are short, then you get a short buffer.  So pay attention
 ;when you are creating the sequence.
-(defn rcgl_create_vbo [render_context_ref render_tasks_ref buf_name vbo_type generator]
-  (let [{ { vbos_ref :vbos_ref } :vbo_manager  
-	  logger_ref :logger_ref } @render_context_ref]
-    (append_to_ref_list render_tasks_ref #(create_vbo logger_ref (. % getGL) vbos_ref buf_name vbo_type generator))))
+(defn rcgl-create-vbo [render-context-ref render-tasks-ref buf-name vbo-type generator]
+  (let [{ { vbos-ref :vbos-ref } :vbo-manager  
+	  logger-ref :logger-ref } @render-context-ref]
+    (append-to-ref-list render-tasks-ref #(create-vbo logger-ref (. % getGL) vbos-ref buf-name vbo-type generator))))
 
-(defn rcgl_delete_vbo [render_context_ref render_tasks_ref buf_name]
-  (let [{ { vbos_ref :vbos_ref } :vbo_manager  
-	  logger_ref :logger_ref } @render_context_ref]
-    (append_to_ref_list render_tasks_ref #(delete_vbo logger_ref (. % getGL) vbos_ref buf_name ))))
+(defn rcgl-delete-vbo [render-context-ref render-tasks-ref buf-name]
+  (let [{ { vbos-ref :vbos-ref } :vbo-manager  
+	  logger-ref :logger-ref } @render-context-ref]
+    (append-to-ref-list render-tasks-ref #(delete-vbo logger-ref (. % getGL) vbos-ref buf-name ))))
 
 ;Functions below are query functions of the render context.
 ;They take a non-ref'd context as they don't change the context
-(defn rcgl_get_vbo [render_context name]
-  (let [{ { vbos_ref :vbos_ref } :vbo_manager } render_context
-	retval (@vbos_ref name)]
-    (if (gl_vbo_valid retval)
+(defn rcgl-get-vbo [render-context name]
+  (let [{ { vbos-ref :vbos-ref } :vbo-manager } render-context
+	retval (@vbos-ref name)]
+    (if (gl-vbo-valid retval)
       retval
       nil)))
 
 ;Returns the glsl program mapped to this name
 ;or nil if the program doesn't exist or is invalid.
-(defn rcgl_get_glsl_program[render_context prog_name]
-  (let [{ { programs_ref :programs_ref } :glsl_manager } render_context
-	program (@programs_ref prog_name)
-	prog_valid (glsl_program_valid program)]
-    (if prog_valid
+(defn rcgl-get-glsl-program[render-context prog-name]
+  (let [{ { programs-ref :programs-ref } :glsl-manager } render-context
+	program (@programs-ref prog-name)
+	prog-valid (glsl-program-valid program)]
+    (if prog-valid
       program
       nil)))
 
@@ -115,33 +115,33 @@
 ;creating surfaces during the render process.  Plus, there is never a good reason
 ;to pass processing off to another thread; you will always just block at the card
 ;trying to create them.
-(defn rcgl_create_context_surface[render_context_ref render_tasks_ref sspec name]
-  (append_to_ref_list render_tasks_ref 
-		      #(create_named_context_surface (@render_context_ref :logger_ref) (. % getGL) (@render_context_ref :surfaces_ref) sspec name)))
+(defn rcgl-create-context-surface[render-context-ref render-tasks-ref sspec name]
+  (append-to-ref-list render-tasks-ref 
+		      #(create-named-context-surface (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) sspec name)))
 
 ;Create a context surface using a list of fallbacks
-(defn rcgl_create_context_surface_seq[render_context_ref render_tasks_ref sspec_seq name]
-  (append_to_ref_list render_tasks_ref 
-		      #(create_named_context_surface_seq (@render_context_ref :logger_ref) (. % getGL) (@render_context_ref :surfaces_ref) sspec_seq name)))
+(defn rcgl-create-context-surface-seq[render-context-ref render-tasks-ref sspec-seq name]
+  (append-to-ref-list render-tasks-ref 
+		      #(create-named-context-surface-seq (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) sspec-seq name)))
 
 
 ;only runs if the surface exists already
-(defn rcgl_update_context_surface[render_context_ref render_tasks_ref name width height]
-  (append_to_ref_list render_tasks_ref 
-		      #(update_named_context_surface (@render_context_ref :logger_ref) (. % getGL) (@render_context_ref :surfaces_ref) name width height)))
+(defn rcgl-update-context-surface[render-context-ref render-tasks-ref name width height]
+  (append-to-ref-list render-tasks-ref 
+		      #(update-named-context-surface (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) name width height)))
 
-(defn rcgl_delete_context_surface[render_context_ref render_tasks_ref name]
-  (append_to_ref_list render_tasks_ref 
-		      #(delete_named_context_surface (@render_context_ref :logger_ref) (. % getGL) (@render_context_ref :surfaces_ref) name)))
+(defn rcgl-delete-context-surface[render-context-ref render-tasks-ref name]
+  (append-to-ref-list render-tasks-ref 
+		      #(delete-named-context-surface (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) name)))
 
 ;this is meant to be called from within the render thread
-(defn rcgl_get_or_create_context_surface[render_context_ref gl sspec name]
-  (get_or_create_context_surface (@render_context_ref :logger_ref) gl (@render_context_ref :surfaces_ref) sspec name))
+(defn rcgl-get-or-create-context-surface[render-context-ref gl sspec name]
+  (get-or-create-context-surface (@render-context-ref :logger-ref) gl (@render-context-ref :surfaces-ref) sspec name))
 
-(defn rcgl_get_context_surface[render_context name]
-  (let [surfaces_ref (render_context :surfaces_ref)
-	retval (@surfaces_ref name)]
-    (if (context_surface_valid_for_render retval)
+(defn rcgl-get-context-surface[render-context name]
+  (let [surfaces-ref (render-context :surfaces-ref)
+	retval (@surfaces-ref name)]
+    (if (context-surface-valid-for-render retval)
       retval
       nil)))
 	
@@ -149,12 +149,12 @@
 ;This is called when all of the resources were destroyed through nefarious means.
 ;The ones that can be regenerated will be.
 ;returns a new render context
-(defn rcgl_resources_destroyed[drawable render_context]
-  (let [{ { programs_ref :programs_ref shaders_ref :shaders_ref } :glsl_manager 
-	  { vbos_ref :vbos_ref } :vbo_manager 
-	  surfaces_ref :surfaces_ref 
-	  logger_ref :logger_ref } render_context ]
-    (resources_released_reload_all_glsl_programs logger_ref drawable programs_ref shaders_ref)
-    (vbo_resources_destroyed logger_ref (. drawable getGL) vbos_ref)
-    (context_surfaces_destroyed logger_ref (. drawable getGL) surfaces_ref))
-    render_context)
+(defn rcgl-resources-destroyed[drawable render-context]
+  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager 
+	  { vbos-ref :vbos-ref } :vbo-manager 
+	  surfaces-ref :surfaces-ref 
+	  logger-ref :logger-ref } render-context ]
+    (resources-released-reload-all-glsl-programs logger-ref drawable programs-ref shaders-ref)
+    (vbo-resources-destroyed logger-ref (. drawable getGL) vbos-ref)
+    (context-surfaces-destroyed logger-ref (. drawable getGL) surfaces-ref))
+    render-context)

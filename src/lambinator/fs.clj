@@ -17,41 +17,43 @@
 ;with the file.
 
 ;actions take a byte array, the filename, the md5 hash of the data
-(defstruct loading_system :file_actions)
+(defstruct loading-system :file-actions)
 ;maps filename to list of actions to take when in memory.
 ;these actions happen in an agent thread sent off using
 ;'send'
-(defn create_loading_system[]
-  (struct loading_system (ref {})))
+(defn create-loading-system[]
+  (struct loading-system (ref {})))
 
-(defn resource_file_exists? [fname]
-  (not (nil? (. (Class/forName "lambinator.fs__init") getResource fname))))
 
-(defn get_full_path[fname]
-  (if (resource_file_exists? fname)
+(defn fs-get-resource-stream[fname]
+  (. (Class/forName "lambinator.fs__init") getResourceAsStream fname))
+
+(defn resource-file-exists? [fname]
+  (not (nil? (fs-get-resource-stream fname))))
+
+(defn get-full-path[fname]
+  (if (resource-file-exists? fname)
     fname
     (. (File. fname) getCanonicalPath)))
 
-(defn file_exists?[fname]
+(defn file-exists?[fname]
   (. (File. fname) exists))
 
-(defn file_or_resource_exists? [fname]
-  (or (file_exists? fname)
-      (resource_file_exists? fname)))
+(defn file-or-resource-exists? [fname]
+  (or (file-exists? fname)
+      (resource-file-exists? fname)))
 
 
-(defn fs_get_resource_stream[fname]
-  (. (Class/forName "lambinator.fs__init") getResourceAsStream fname))
 
-(defn fs_get_item_input_stream[fname]
-  (let [rsrc_stream (fs_get_resource_stream fname)]
-    (if rsrc_stream
-      rsrc_stream
+(defn fs-get-item-input-stream[fname]
+  (let [rsrc-stream (fs-get-resource-stream fname)]
+    (if rsrc-stream
+      rsrc-stream
       (FileInputStream. fname))))
 
 ;attempts to load a file, producing a byte buffer
 ;You should have ensured it existed
-(defn fs_load_file [fname]
+(defn fs-load-file [fname]
   (let [file (File. fname)
 	input (FileInputStream. file)
 	len (. file length)
@@ -60,61 +62,61 @@
     bytes))
 	
 
-(defn fs_load_resource [fname]
-  (let [stream (fs_get_resource_stream fname)
+(defn fs-load-resource [fname]
+  (let [stream (fs-get-resource-stream fname)
 	length (. stream available)
 	retval (make-array Byte/TYPE length)]
     (. stream read retval)
     retval))
 
-(defn fs_load_item [fname]
-  (if (resource_file_exists? fname)
-    (fs_load_resource fname)
-    (fs_load_file fname)))
+(defn fs-load-item [fname]
+  (if (resource-file-exists? fname)
+    (fs-load-resource fname)
+    (fs-load-file fname)))
 
-(defn fs_to_hex [bytes]
+(defn fs-to-hex [bytes]
   (let [integer (BigInteger. bytes)]
     (. integer toString 16)))
       
 
-(defn fs_md5_hash [bytes]
+(defn fs-md5-hash [bytes]
   (let [digest (MessageDigest/getInstance "md5")]
     (. digest update bytes)
-    (fs_to_hex (. digest digest))))
+    (fs-to-hex (. digest digest))))
 
 ;Gets the list of actions and removes the filename
 ;from the map.
-(defn get_filename_actions[actions_map_ref filename]
+(defn get-filename-actions[actions-map-ref filename]
   (dosync
-   (let [actions_map @actions_map_ref
-	 actions (actions_map filename)]
-     (ref-set actions_map_ref (dissoc actions_map filename))
+   (let [actions-map @actions-map-ref
+	 actions (actions-map filename)]
+     (ref-set actions-map-ref (dissoc actions-map filename))
      actions)))
 
 ;Adds an action.  Returns the existing entry before adding new actions
-(defn- add_filename_action [actions_map_ref filename action]
+(defn- add-filename-action [actions-map-ref filename action]
   (dosync
-   (let [actions @actions_map_ref
+   (let [actions @actions-map-ref
 	 existing (actions filename)
-	 new_actions (assoc actions filename (conj existing action))]
-     (ref-set actions_map_ref new_actions)
+	 new-actions (assoc actions filename (conj existing action))]
+     (ref-set actions-map-ref new-actions)
      existing)))
        
 
-(defn fs_thread_md5[actions_map_ref filename bytes]
-  ;(println "md5ing in" (lambinator.util/current_thread_id))
-  (let [md5_hash (fs_md5_hash bytes)
-	actions (get_filename_actions actions_map_ref filename)
-	actions_agent (agent [])]
+(defn fs-thread-md5[actions-map-ref filename bytes]
+  ;(println "md5ing in" (lambinator.util/current-thread-id))
+  (let [md5-hash (fs-md5-hash bytes)
+	actions (get-filename-actions actions-map-ref filename)
+	actions-agent (agent [])]
     (doseq [action actions]
-      (send actions_agent (fn [agent] (action bytes filename md5_hash) nil)))))
+      (send actions-agent (fn [agent] (action bytes filename md5-hash) nil)))))
 
-(defn fs_thread_load[actions_map_ref filename]
-  ;(println "loading in" (lambinator.util/current_thread_id))
-  (let [bytes (fs_load_item filename)
-	md5_agent (agent [])]
-    (send md5_agent 
-	  (fn [agent] (fs_thread_md5 actions_map_ref filename bytes) []))))
+(defn fs-thread-load[actions-map-ref filename]
+  ;(println "loading in" (lambinator.util/current-thread-id))
+  (let [bytes (fs-load-item filename)
+	md5-agent (agent [])]
+    (send md5-agent 
+	  (fn [agent] (fs-thread-md5 actions-map-ref filename bytes) []))))
 
 ;task must take 3 arguments:
 ;byte array, filename, and md5 hash of data
@@ -122,19 +124,19 @@
 ;off a new loading process.  Returns true if the file
 ;existed in disk and thus this task happens.
 ;false if the file didn't exist.
-(defn fs_add_load_task[loading_system fname task]
-  (let [full_file_name (get_full_path fname)
-	actions_map_ref (loading_system :file_actions)
-	exists (file_or_resource_exists? fname)]
+(defn fs-add-load-task[loading-system fname task]
+  (let [full-file-name (get-full-path fname)
+	actions-map-ref (loading-system :file-actions)
+	exists (file-or-resource-exists? fname)]
     (if exists 
-      (let [existing (add_filename_action actions_map_ref full_file_name task)]
+      (let [existing (add-filename-action actions-map-ref full-file-name task)]
 	(when (not existing)
-	  (let [load_agent (agent {})]
-	    (send-off load_agent (fn [agent] (fs_thread_load actions_map_ref full_file_name)))))
+	  (let [load-agent (agent {})]
+	    (send-off load-agent (fn [agent] (fs-thread-load actions-map-ref full-file-name)))))
 	true )
       false)))
 
-(defn fs_get_file_mod_time [fname]
+(defn fs-get-file-mod-time [fname]
   (let [file (File. fname)]
     (if (. file exists) 
       (. file lastModified)
@@ -146,82 +148,82 @@
 ;no mod time is fine; a new one will be inserted
 ;and marked as changed.
 ;a file that doesn't exist gets a nil mod time
-(defn check_file_modifications[file_mod_seq]
-  (map (fn [[fname mod_time]]
-	 (let [new_mod_time (fs_get_file_mod_time fname)]
-	   [fname new_mod_time (not(= mod_time new_mod_time))]))
-       file_mod_seq))
+(defn check-file-modifications[file-mod-seq]
+  (map (fn [[fname mod-time]]
+	 (let [new-mod-time (fs-get-file-mod-time fname)]
+	   [fname new-mod-time (not(= mod-time new-mod-time))]))
+       file-mod-seq))
 
 ;a watcher takes one argument, the filename when the file
 ;has changed
-(defstruct file_mod_watcher_entry :filename :watchers :mod_time)
+(defstruct file-mod-watcher-entry :filename :watchers :mod-time)
 
-(defstruct file_mod_watcher_system :file_watchers_ref)
-(defn create_file_mod_watcher_system [] (struct file_mod_watcher_system (ref {})))
+(defstruct file-mod-watcher-system :file-watchers-ref)
+(defn create-file-mod-watcher-system [] (struct file-mod-watcher-system (ref {})))
 
-(defn internal_add_file_mod_watcher [file_watchers fname watcher_name watcher]
-  (let [existing (file_watchers fname)
+(defn internal-add-file-mod-watcher [file-watchers fname watcher-name watcher]
+  (let [existing (file-watchers fname)
 	existing (if existing
 		   existing
-		   (struct-map file_mod_watcher_entry
+		   (struct-map file-mod-watcher-entry
 		     :filename fname
 		     :watchers {}
-		     :mod_time nil))]
-    (assoc file_watchers fname 
+		     :mod-time nil))]
+    (assoc file-watchers fname 
 	   (assoc existing :watchers
-		  (assoc (existing :watchers) watcher_name watcher)))))
+		  (assoc (existing :watchers) watcher-name watcher)))))
 
-(defn fs_add_file_mod_watcher [fs_watcher_system fname watcher_name watcher]
-  (let [file_watchers_ref (fs_watcher_system :file_watchers_ref)]
+(defn fs-add-file-mod-watcher [fs-watcher-system fname watcher-name watcher]
+  (let [file-watchers-ref (fs-watcher-system :file-watchers-ref)]
     (dosync 
-     (alter file_watchers_ref internal_add_file_mod_watcher fname watcher_name watcher))))
+     (alter file-watchers-ref internal-add-file-mod-watcher fname watcher-name watcher))))
 
-(defn interal_remove_file_mod_watcher [watchers fname watcher_name]
+(defn interal-remove-file-mod-watcher [watchers fname watcher-name]
   (let [existing (watchers fname)
-	existing_entries (if existing
+	existing-entries (if existing
 			   (existing :watchers)
 			   nil)
-	new_entries (when existing_entries
-		      (let [new_entries (dissoc existing_entries watcher_name)]
-			(when (seq new_entries)
-			  new_entries)))
-	new_existing (when new_entries
-		       (assoc existing :watchers new_entries))]
-    (if new_existing
-      (assoc watchers fname new_existing)
+	new-entries (when existing-entries
+		      (let [new-entries (dissoc existing-entries watcher-name)]
+			(when (seq new-entries)
+			  new-entries)))
+	new-existing (when new-entries
+		       (assoc existing :watchers new-entries))]
+    (if new-existing
+      (assoc watchers fname new-existing)
       (dissoc watchers fname))))
     
 
-(defn fs_remove_file_mod_watcher [fs_watcher_system fname watcher_name]
-  (let [file_watchers_ref (fs_watcher_system :file_watchers_ref)]
+(defn fs-remove-file-mod-watcher [fs-watcher-system fname watcher-name]
+  (let [file-watchers-ref (fs-watcher-system :file-watchers-ref)]
     (dosync 
-     (alter file_watchers_ref interal_remove_file_mod_watcher fname watcher_name))))
+     (alter file-watchers-ref interal-remove-file-mod-watcher fname watcher-name))))
     
 
-(defn fs_mod_system_check_files [fs_watcher_system]
-  (let [current_watchers @(fs_watcher_system :file_watchers_ref)
-	filemod_seq (map (fn [[fname entry]]
-			   [fname (entry :mod_time)])
-			 current_watchers)
-	filechanges (check_file_modifications filemod_seq)
-	truechanges (filter (fn [[_ _ retval]] retval) filechanges)
-	new_entries (map (fn [[fname mod_time _]]
-			   [fname (assoc (current_watchers fname) :mod_time mod_time)])
+(defn fs-mod-system-check-files [fs-watcher-system]
+  (let [current-watchers @(fs-watcher-system :file-watchers-ref)
+	filemod-seq (map (fn [[fname entry]]
+			   [fname (entry :mod-time)])
+			 current-watchers)
+	filechanges (check-file-modifications filemod-seq)
+	truechanges (filter (fn [[- - retval]] retval) filechanges)
+	new-entries (map (fn [[fname mod-time -]]
+			   [fname (assoc (current-watchers fname) :mod-time mod-time)])
 			 truechanges)
-	new_entries_expanded (mapcat identity new_entries)]
-    (when new_entries
-      (doseq [[name new_entry] new_entries]
-	(doseq [[watcher_name watcher] (new_entry :watchers)]
+	new-entries-expanded (mapcat identity new-entries)]
+    (when new-entries
+      (doseq [[name new-entry] new-entries]
+	(doseq [[watcher-name watcher] (new-entry :watchers)]
 	  (try
 	   (watcher name)
 	   (catch Exception e
 	     (. e printStackTrace)))))
       (dosync 
-       (alter (fs_watcher_system :file_watchers_ref)
-	      (fn [fname_watchers]
-		(apply assoc fname_watchers new_entries_expanded)))))))
+       (alter (fs-watcher-system :file-watchers-ref)
+	      (fn [fname-watchers]
+		(apply assoc fname-watchers new-entries-expanded)))))))
 
-(defn split_fname_into_name_ending[fname]
+(defn split-fname-into-name-ending[fname]
   (if fname
     (let [lindex (. fname lastIndexOf ".")]
       (if (and (>= lindex 0) 
@@ -231,48 +233,48 @@
     ["" ""]))
 
 ;returns a java.io.file
-(defn fs_get_temp_file [fname]
-  (let [temp_dir (System/getProperty "java.io.tmpdir")
-	temp_fname (. (File. fname) getName)
-	[temp_stem temp_ending] (split_fname_into_name_ending temp_fname)
-	current_file (File. temp_dir temp_fname)]
-    (if (. current_file exists)
+(defn fs-get-temp-file [fname]
+  (let [temp-dir (System/getProperty "java.io.tmpdir")
+	temp-fname (. (File. fname) getName)
+	[temp-stem temp-ending] (split-fname-into-name-ending temp-fname)
+	current-file (File. temp-dir temp-fname)]
+    (if (. current-file exists)
       (first (filter (fn [file]
 		       (not (. file exists)))
-		     (map (fn [index] (File. temp_dir (stringify temp_stem index temp_ending)))
+		     (map (fn [index] (File. temp-dir (stringify temp-stem index temp-ending)))
 			  (iterate inc 0))))
-      current_file)))
+      current-file)))
     
 ;http://www.rgagnon.com/javadetails/java-0064.html
-(defn fs_copy_stream_to_file [input_stream fname]
-  (with-open [output_stream (FileOutputStream. fname)]
-    (if (isa? FileInputStream input_stream)
-      (let [in_channel (. input_stream getChannel)
-	    out_channel (. output_stream getChannel)
+(defn fs-copy-stream-to-file [input-stream fname]
+  (with-open [output-stream (FileOutputStream. fname)]
+    (if (isa? FileInputStream input-stream)
+      (let [in-channel (. input-stream getChannel)
+	    out-channel (. output-stream getChannel)
 					; magic number for Windows, 64Mb - 32Kb)
-	    max_count  (- (* 64 1024 1024) (* 32 1024))
-	    size (. in_channel size)
+	    max-count  (- (* 64 1024 1024) (* 32 1024))
+	    size (. in-channel size)
 	    iterations (take-while (fn [pos]
 				     (< pos size))
-				   (iterate #(+ (. in_channel transferTo % max_count out_channel) %) 0))]
+				   (iterate #(+ (. in-channel transferTo % max-count out-channel) %) 0))]
 	(last iterations))
       (let [bytes (make-array Byte/TYPE 1024)
-	    read_fn (fn [[bytes_read total_bytes_read]]
-		      (let [new_bytes (. input_stream read bytes)
-			    valid_read (> new_bytes 0)
-			    retval (if valid_read 
+	    read-fn (fn [[bytes-read total-bytes-read]]
+		      (let [new-bytes (. input-stream read bytes)
+			    valid-read (> new-bytes 0)
+			    retval (if valid-read 
 				     (do 
-				       (. output_stream write bytes 0 new_bytes)
-				       (+ total_bytes_read new_bytes))
-				     total_bytes_read)]
-			[new_bytes retval]))
+				       (. output-stream write bytes 0 new-bytes)
+				       (+ total-bytes-read new-bytes))
+				     total-bytes-read)]
+			[new-bytes retval]))
 		      
-	    iterations (take-while (fn [[bytes_read total_bytes_read]]
-				     (> bytes_read 0))
-				   (iterate read_fn (read_fn [0 0])))]
+	    iterations (take-while (fn [[bytes-read total-bytes-read]]
+				     (> bytes-read 0))
+				   (iterate read-fn (read-fn [0 0])))]
 	((last iterations) 1)))))
 
-(defn fs_copy_item_stream_to_file [ifname ofname]
-  (with-open [input_stream (fs_get_item_input_stream ifname)]
-    (fs_copy_stream_to_file input_stream ofname)))
+(defn fs-copy-item-stream-to-file [ifname ofname]
+  (with-open [input-stream (fs-get-item-input-stream ifname)]
+    (fs-copy-stream-to-file input-stream ofname)))
     

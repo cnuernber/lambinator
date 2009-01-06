@@ -1,49 +1,49 @@
 (in-ns 'lambinator.rcgl)
 
-(defstruct context_texture :texture_spec :gl_handle)
+(defstruct context-texture :texture-spec :gl-handle)
 
-(defn create_context_texture [texture_spec gl_handle]
-  (struct context_texture texture_spec gl_handle))
+(defn create-context-texture [texture-spec gl-handle]
+  (struct context-texture texture-spec gl-handle))
 
-(defstruct texture_manager :textures )
+(defstruct texture-manager :textures )
 
-(defn create_texture_manager []
-  (struct texture_manager []))
+(defn create-texture-manager []
+  (struct texture-manager []))
 
-(defn allocate_opengl_texture_handle[gl]
-  (allocate_gl_item (fn [count args offset] (. gl glGenTextures count args offset))))
+(defn allocate-opengl-texture-handle[gl]
+  (allocate-gl-item (fn [count args offset] (. gl glGenTextures count args offset))))
 
-(defn release_opengl_texture_handle [gl hdl]
-  (release_gl_item (fn [count args offset] (. gl glDeleteTextures count args offset)) hdl))
+(defn release-opengl-texture-handle [gl hdl]
+  (release-gl-item (fn [count args offset] (. gl glDeleteTextures count args offset)) hdl))
 	
 ;takes a gl, a texture spec,
-;and returns a context_texture
+;and returns a context-texture
 ;This simply allocates a texture handle
-(defn allocate_opengl_texture [gl texture_spec]
-  (create_context_texture 
-   texture_spec 
-   (allocate_opengl_texture_handle gl)
+(defn allocate-opengl-texture [gl texture-spec]
+  (create-context-texture 
+   texture-spec 
+   (allocate-opengl-texture-handle gl)
    ))
 
 ;releases the gl handle and returns a new context texture
 ;with the handle value set to -1
-(defn release_opengl_texture [gl context_texture]
-  (let [tex_handle (context_texture :gl_handle)]
-    (release_opengl_texture_handle gl tex_handle)
-    (create_context_texture (context_texture :texture_spec) -1)))
+(defn release-opengl-texture [gl context-texture]
+  (let [tex-handle (context-texture :gl-handle)]
+    (release-opengl-texture-handle gl tex-handle)
+    (create-context-texture (context-texture :texture-spec) -1)))
 
 ;A context texture is empty if its gl handle <= 0
-(defn find_empty_context_texture[textures]
-  (util_find_next_matching_index textures
-				 #(<= 0 (% :gl_handle)) (fn [] nil)))
+(defn find-empty-context-texture[textures]
+  (util-find-next-matching-index textures
+				 #(<= 0 (% :gl-handle)) (fn [] nil)))
 
-(defn allocate_context_texture_item[gl textures texture_spec]
-  (let [[index textures] (find_empty_context_texture textures)
-	context_texture (allocate_opengl_texture gl texture_spec)]
-    [(assoc textures index context_texture) index]))
+(defn allocate-context-texture-item[gl textures texture-spec]
+  (let [[index textures] (find-empty-context-texture textures)
+	context-texture (allocate-opengl-texture gl texture-spec)]
+    [(assoc textures index context-texture) index]))
 
-(defn release_context_texture_item[gl textures index]
-  (let [context_texture (textures index)]
-    (assoc textures index (release_opengl_texture gl context_texture))))
+(defn release-context-texture-item[gl textures index]
+  (let [context-texture (textures index)]
+    (assoc textures index (release-opengl-texture gl context-texture))))
     
   

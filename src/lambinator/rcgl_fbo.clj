@@ -1,261 +1,261 @@
 (in-ns 'lambinator.rcgl)
 
-(defn rcgl_fbo_log [log_data_ref type & args]
-  (when log_data_ref
-    (log_message @log_data_ref "rcgl.fbo:" type args)))
+(defn rcgl-fbo-log [log-data-ref type & args]
+  (when log-data-ref
+    (log-message @log-data-ref "rcgl.fbo:" type args)))
 
 ;surfaces is a vector of all the known surfaces
 ;unused is a linked list of the unused surfaces
 ;render size may be <= surface size
-(defstruct context_renderbuffer :gl_handle :texture_gl_handle :gl_error)
-(defstruct context_surface :gl_handle :surface_spec :attachments :framebuffer_status :name :gl_error )
+(defstruct context-renderbuffer :gl-handle :texture-gl-handle :gl-error)
+(defstruct context-surface :gl-handle :surface-spec :attachments :framebuffer-status :name :gl-error )
 
-(defn context_renderbuffer_valid [rb]
+(defn context-renderbuffer-valid [rb]
   (and rb
-       (> (rb :gl_handle) 0)))
+       (> (rb :gl-handle) 0)))
 
-(defn context_renderbuffer_texture_valid[rb]
-  (and (context_renderbuffer_valid rb)
-       (> (rb :texture_gl_handle) 0)))
+(defn context-renderbuffer-texture-valid[rb]
+  (and (context-renderbuffer-valid rb)
+       (> (rb :texture-gl-handle) 0)))
 
-(defn context_surface_valid[surface]
+(defn context-surface-valid[surface]
   (and surface
-       (> (surface :gl_handle) 0)))
+       (> (surface :gl-handle) 0)))
 
-(defn context_surface_valid_for_render[surface]
-  (and (context_surface_valid surface)
-       (== (surface :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)))
+(defn context-surface-valid-for-render[surface]
+  (and (context-surface-valid surface)
+       (== (surface :framebuffer-status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)))
 
 ;takes a gl and returns a framebuffer index
-(defn allocate_opengl_framebuffer_object [gl]
-  (allocate_gl_item (fn [count args offset] (. gl glGenFramebuffersEXT count args offset))))
+(defn allocate-opengl-framebuffer-object [gl]
+  (allocate-gl-item (fn [count args offset] (. gl glGenFramebuffersEXT count args offset))))
 
 ;takes a gl and a fbo handle, calls release and returns an invalid handle value
-(defn release_opengl_framebuffer_object [gl fbo_handle]
-  (release_gl_item (fn [count args offset] (. gl glDeleteFramebuffersEXT count args offset)) fbo_handle)
+(defn release-opengl-framebuffer-object [gl fbo-handle]
+  (release-gl-item (fn [count args offset] (. gl glDeleteFramebuffersEXT count args offset)) fbo-handle)
   0)
 
-(defn allocate_opengl_framebuffer_renderbuffer [gl]
-  (allocate_gl_item (fn [count args offset] (. gl glGenRenderbuffersEXT count args offset))))
+(defn allocate-opengl-framebuffer-renderbuffer [gl]
+  (allocate-gl-item (fn [count args offset] (. gl glGenRenderbuffersEXT count args offset))))
 
-(defn release_opengl_framebffer_renderbuffer [gl rb_hdl]
-  (release_gl_item (fn [count args offset] (. gl glDeleteRenderbuffersEXT count args offset)) rb_hdl))
+(defn release-opengl-framebffer-renderbuffer [gl rb-hdl]
+  (release-gl-item (fn [count args offset] (. gl glDeleteRenderbuffersEXT count args offset)) rb-hdl))
 
-(defmulti gl_attachment_point_from_rc_attachment_point identity)
-(defmethod gl_attachment_point_from_rc_attachment_point :color0 [_] GL/GL_COLOR_ATTACHMENT0_EXT)
-(defmethod gl_attachment_point_from_rc_attachment_point :color1 [_] GL/GL_COLOR_ATTACHMENT1_EXT)
-(defmethod gl_attachment_point_from_rc_attachment_point :color2 [_] GL/GL_COLOR_ATTACHMENT2_EXT)
-(defmethod gl_attachment_point_from_rc_attachment_point :color3 [_] GL/GL_COLOR_ATTACHMENT3_EXT)
-(defmethod gl_attachment_point_from_rc_attachment_point :depth [_] GL/GL_DEPTH_ATTACHMENT_EXT)
+(defmulti gl-attachment-point-from-rc-attachment-point identity)
+(defmethod gl-attachment-point-from-rc-attachment-point :color0 [-] GL/GL_COLOR_ATTACHMENT0_EXT)
+(defmethod gl-attachment-point-from-rc-attachment-point :color1 [-] GL/GL_COLOR_ATTACHMENT1_EXT)
+(defmethod gl-attachment-point-from-rc-attachment-point :color2 [-] GL/GL_COLOR_ATTACHMENT2_EXT)
+(defmethod gl-attachment-point-from-rc-attachment-point :color3 [-] GL/GL_COLOR_ATTACHMENT3_EXT)
+(defmethod gl-attachment-point-from-rc-attachment-point :depth [-] GL/GL_DEPTH_ATTACHMENT_EXT)
 
-(defn create_and_bind_renderbuffer [gl internal_format width height attach_pt]
-  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
-	gl_attach_pt (gl_attachment_point_from_rc_attachment_point attach_pt)]
-    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
-    (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal_format width height)
+(defn create-and-bind-renderbuffer [gl internal-format width height attach-pt]
+  (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
+	gl-attach-pt (gl-attachment-point-from-rc-attachment-point attach-pt)]
+    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb-handle)
+    (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal-format width height)
     (. gl glFramebufferRenderbufferEXT 
-       GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
-    (struct context_renderbuffer rb_handle 0 (get_gl_error gl))))
+       GL/GL_FRAMEBUFFER_EXT gl-attach-pt GL/GL_RENDERBUFFER_EXT rb-handle)
+    (struct context-renderbuffer rb-handle 0 (get-gl-error gl))))
 
-(defn create_and_bind_textured_renderbuffer[gl internal_format width height external_format external_datatype attach_pt binding_func]
-  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
-	tex_handle (allocate_opengl_texture_handle gl)]
-    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
-    (. gl glBindTexture GL/GL_TEXTURE_2D tex_handle)
-    (when binding_func
-      (binding_func))
-    (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal_format width height 0 external_format external_datatype nil)
+(defn create-and-bind-textured-renderbuffer[gl internal-format width height external-format external-datatype attach-pt binding-func]
+  (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
+	tex-handle (allocate-opengl-texture-handle gl)]
+    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb-handle)
+    (. gl glBindTexture GL/GL_TEXTURE_2D tex-handle)
+    (when binding-func
+      (binding-func))
+    (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal-format width height 0 external-format external-datatype nil)
     (. gl glFramebufferTexture2DEXT 
        GL/GL_FRAMEBUFFER_EXT 
-       (gl_attachment_point_from_rc_attachment_point attach_pt) GL/GL_TEXTURE_2D 
-       tex_handle 0)
-    (struct context_renderbuffer rb_handle tex_handle (get_gl_error gl))))	
+       (gl-attachment-point-from-rc-attachment-point attach-pt) GL/GL_TEXTURE_2D 
+       tex-handle 0)
+    (struct context-renderbuffer rb-handle tex-handle (get-gl-error gl))))	
 
-(defmulti create_context_rb (fn [gl attach_pt renderbuffer width height] [(renderbuffer :type) (renderbuffer :use_texture)]))
-(defmethod create_context_rb [:color false] [gl attach_pt renderbuffer width height]
-  (let [rc_format (renderbuffer :color_format)
-	rc_dtype (renderbuffer :color_datatype)
-	internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)]
-    (create_and_bind_renderbuffer gl internal_format width height attach_pt)))
+(defmulti create-context-rb (fn [gl attach-pt renderbuffer width height] [(renderbuffer :type) (renderbuffer :use-texture)]))
+(defmethod create-context-rb [:color false] [gl attach-pt renderbuffer width height]
+  (let [rc-format (renderbuffer :color-format)
+	rc-dtype (renderbuffer :color-datatype)
+	internal-format (gl-internal-format-from-texture-format-and-type rc-format rc-dtype)]
+    (create-and-bind-renderbuffer gl internal-format width height attach-pt)))
 
-(defmethod create_context_rb [:color true] [gl attach_pt renderbuffer width height]
-  (let [rc_format (renderbuffer :color_format)
-	rc_dtype (renderbuffer :color_datatype)]
-    (let [internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)
-	  external_format (gl_external_format_from_texture_format rc_format)
-	  external_datatype (gl_external_datatype_from_texture_datatype rc_dtype)]
-      (create_and_bind_textured_renderbuffer gl internal_format width height external_format external_datatype attach_pt nil))))
+(defmethod create-context-rb [:color true] [gl attach-pt renderbuffer width height]
+  (let [rc-format (renderbuffer :color-format)
+	rc-dtype (renderbuffer :color-datatype)]
+    (let [internal-format (gl-internal-format-from-texture-format-and-type rc-format rc-dtype)
+	  external-format (gl-external-format-from-texture-format rc-format)
+	  external-datatype (gl-external-datatype-from-texture-datatype rc-dtype)]
+      (create-and-bind-textured-renderbuffer gl internal-format width height external-format external-datatype attach-pt nil))))
 
-(defmethod create_context_rb [:depth false] [gl attach_pt renderbuffer width height]
-  (let [depth_constant (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))]
-    (create_and_bind_renderbuffer gl depth_constant width height attach_pt)))
+(defmethod create-context-rb [:depth false] [gl attach-pt renderbuffer width height]
+  (let [depth-constant (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))]
+    (create-and-bind-renderbuffer gl depth-constant width height attach-pt)))
 
 
-(defmethod create_context_rb [:depth true] [gl attach_pt renderbuffer width height]
-  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
-	depth_constant (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))
-	internal_format (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))
-	tex_handle (allocate_opengl_texture_handle gl)
-	external_format GL/GL_DEPTH_COMPONENT
-	external_datatype GL/GL_FLOAT
-	binding_func (fn []
+(defmethod create-context-rb [:depth true] [gl attach-pt renderbuffer width height]
+  (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
+	depth-constant (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))
+	internal-format (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))
+	tex-handle (allocate-opengl-texture-handle gl)
+	external-format GL/GL_DEPTH_COMPONENT
+	external-datatype GL/GL_FLOAT
+	binding-func (fn []
 		       (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_COMPARE_FUNC GL/GL_LEQUAL) ;write-property ) think
 		       (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_DEPTH_TEXTURE_MODE GL/GL_LUMINANCE) ;read-property, not strictly necessary to set here
 		       (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_COMPARE_MODE GL/GL_COMPARE_R_TO_TEXTURE))] ;write-property I think
-    (create_and_bind_textured_renderbuffer gl internal_format width height external_format external_datatype attach_pt binding_func)))
+    (create-and-bind-textured-renderbuffer gl internal-format width height external-format external-datatype attach-pt binding-func)))
 
-(defmulti gl_num_samples_from_num_samples identity)
-(defmethod gl_num_samples_from_num_samples :default [_] 4)
-(defmethod gl_num_samples_from_num_samples :2 [_] 2)
-(defmethod gl_num_samples_from_num_samples :8 [_] 8)
-(defmethod gl_num_samples_from_num_samples :16 [_] 16)
+(defmulti gl-num-samples-from-num-samples identity)
+(defmethod gl-num-samples-from-num-samples :default [-] 4)
+(defmethod gl-num-samples-from-num-samples :2 [-] 2)
+(defmethod gl-num-samples-from-num-samples :8 [-] 8)
+(defmethod gl-num-samples-from-num-samples :16 [-] 16)
 
-(defn create_and_bind_multisample_renderbuffer [log_data_ref gl attach_pt width height internal_format num_samples]
-  (let [rb_handle (allocate_opengl_framebuffer_renderbuffer gl)
-	gl_num_samples (gl_num_samples_from_num_samples num_samples)
-	gl_attach_pt (gl_attachment_point_from_rc_attachment_point attach_pt)]
-    (rcgl_fbo_log log_data_ref :info "allocating multisample renderbuffer (samples): " num_samples )
-    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb_handle)
-    (. gl glRenderbufferStorageMultisampleEXT GL/GL_RENDERBUFFER_EXT gl_num_samples internal_format width height)
+(defn create-and-bind-multisample-renderbuffer [log-data-ref gl attach-pt width height internal-format num-samples]
+  (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
+	gl-num-samples (gl-num-samples-from-num-samples num-samples)
+	gl-attach-pt (gl-attachment-point-from-rc-attachment-point attach-pt)]
+    (rcgl-fbo-log log-data-ref :info "allocating multisample renderbuffer (samples): " num-samples )
+    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb-handle)
+    (. gl glRenderbufferStorageMultisampleEXT GL/GL_RENDERBUFFER_EXT gl-num-samples internal-format width height)
     (. gl glFramebufferRenderbufferEXT 
-       GL/GL_FRAMEBUFFER_EXT gl_attach_pt GL/GL_RENDERBUFFER_EXT rb_handle)
-    (struct context_renderbuffer rb_handle 0 (get_gl_error gl))))
+       GL/GL_FRAMEBUFFER_EXT gl-attach-pt GL/GL_RENDERBUFFER_EXT rb-handle)
+    (struct context-renderbuffer rb-handle 0 (get-gl-error gl))))
 
-(defn create_multisample_renderbuffer_dispatch [log_data_ref gl attach_pt renderbuffer & args] (renderbuffer :type))
+(defn create-multisample-renderbuffer-dispatch [log-data-ref gl attach-pt renderbuffer & args] (renderbuffer :type))
 
-(defmulti create_multisample_renderbuffer create_multisample_renderbuffer_dispatch )
+(defmulti create-multisample-renderbuffer create-multisample-renderbuffer-dispatch )
 
-(defmethod create_multisample_renderbuffer :color [log_data_ref gl attach_pt renderbuffer width height num_samples]
-  (let [rc_format (renderbuffer :color_format)
-	rc_dtype (renderbuffer :color_datatype)
-	internal_format (gl_internal_format_from_texture_format_and_type rc_format rc_dtype)]
-    (create_and_bind_multisample_renderbuffer log_data_ref gl attach_pt width height internal_format num_samples)))
+(defmethod create-multisample-renderbuffer :color [log-data-ref gl attach-pt renderbuffer width height num-samples]
+  (let [rc-format (renderbuffer :color-format)
+	rc-dtype (renderbuffer :color-datatype)
+	internal-format (gl-internal-format-from-texture-format-and-type rc-format rc-dtype)]
+    (create-and-bind-multisample-renderbuffer log-data-ref gl attach-pt width height internal-format num-samples)))
 
-(defmethod create_multisample_renderbuffer :depth [log_data_ref gl attach_pt renderbuffer width height num_samples]
-  (let [internal_format (convert_depth_bits_to_gl_constant (renderbuffer :depth_bits))]
-    (create_and_bind_multisample_renderbuffer log_data_ref gl attach_pt width height internal_format num_samples)))
+(defmethod create-multisample-renderbuffer :depth [log-data-ref gl attach-pt renderbuffer width height num-samples]
+  (let [internal-format (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))]
+    (create-and-bind-multisample-renderbuffer log-data-ref gl attach-pt width height internal-format num-samples)))
 
-(defn create_context_surface[log_data_ref gl sspec name]
-  (let [has_multi_sample (has_multi_sample sspec)
-	fbo_handle (allocate_opengl_framebuffer_object gl)
+(defn create-context-surface[log-data-ref gl sspec name]
+  (let [has-multi-sample (has-multi-sample sspec)
+	fbo-handle (allocate-opengl-framebuffer-object gl)
 	[width height] (sspec :size)
-	num_samples (sspec :multi_sample)]
+	num-samples (sspec :multi-sample)]
     (try
-     (if has_multi_sample
-       (rcgl_fbo_log log_data_ref :info "creating multi-sample context surface: " name " , number of samples: " num_samples )
-       (rcgl_fbo_log log_data_ref :info "creating context surface: " name))
-     (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo_handle)
-     (let [context_renderbuffer_mapcat_fn (if has_multi_sample
-					    (fn [[attach_pt renderbuffer]]
-					      [ attach_pt (create_multisample_renderbuffer log_data_ref gl attach_pt renderbuffer width height num_samples) ])
-					    (fn [[attach_pt renderbuffer]]
-					      [attach_pt (create_context_rb gl attach_pt renderbuffer width height)]))
-	   context_renderbuffers (mapcat context_renderbuffer_mapcat_fn (sspec :attachments))
-	   context_renderbuffer_map (if context_renderbuffers
-				      (apply assoc {} context_renderbuffers)
+     (if has-multi-sample
+       (rcgl-fbo-log log-data-ref :info "creating multi-sample context surface: " name " , number of samples: " num-samples )
+       (rcgl-fbo-log log-data-ref :info "creating context surface: " name))
+     (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo-handle)
+     (let [context-renderbuffer-mapcat-fn (if has-multi-sample
+					    (fn [[attach-pt renderbuffer]]
+					      [ attach-pt (create-multisample-renderbuffer log-data-ref gl attach-pt renderbuffer width height num-samples) ])
+					    (fn [[attach-pt renderbuffer]]
+					      [attach-pt (create-context-rb gl attach-pt renderbuffer width height)]))
+	   context-renderbuffers (mapcat context-renderbuffer-mapcat-fn (sspec :attachments))
+	   context-renderbuffer-map (if context-renderbuffers
+				      (apply assoc {} context-renderbuffers)
 				      {})
 	   complete (. gl glCheckFramebufferStatusEXT GL/GL_FRAMEBUFFER_EXT)]
-       (rcgl_fbo_log log_data_ref :info "Framebuffer complete: " (get_opengl_constant_name complete))
-       (struct-map context_surface 
-	 :gl_handle fbo_handle 
-	 :surface_spec sspec 
-	 :attachments context_renderbuffer_map 
-	 :framebuffer_status complete
+       (rcgl-fbo-log log-data-ref :info "Framebuffer complete: " (get-opengl-constant-name complete))
+       (struct-map context-surface 
+	 :gl-handle fbo-handle 
+	 :surface-spec sspec 
+	 :attachments context-renderbuffer-map 
+	 :framebuffer-status complete
 	 :name name
-	 :gl_error (get_gl_error gl)))
+	 :gl-error (get-gl-error gl)))
      (catch Exception e 
        ;this is important, if an exception is thrown at a bad time
        ;then unless you release the fbo object your program will
        ;be unable to create more fbo's!
-       (release_opengl_framebuffer_object log_data_ref gl fbo_handle) 
+       (release-opengl-framebuffer-object log-data-ref gl fbo-handle) 
        (throw e))
      (finally 
       (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))))
 
-(defn delete_context_surface[log_data_ref gl ctx_sface]
-  (when (context_surface_valid ctx_sface)
-    (rcgl_fbo_log log_data_ref :info "deleting context surface: " (ctx_sface :name))
-    (doseq [[attach_pt context_rb] (ctx_sface :attachments)]
-      (when (context_renderbuffer_texture_valid context_rb)
-	(release_opengl_texture_handle gl (context_rb :texture_gl_handle)))
-      (when (context_renderbuffer_valid context_rb)
-	(release_opengl_framebffer_renderbuffer gl (context_rb :gl_handle))))
-    (release_opengl_framebuffer_object gl (ctx_sface :gl_handle))
+(defn delete-context-surface[log-data-ref gl ctx-sface]
+  (when (context-surface-valid ctx-sface)
+    (rcgl-fbo-log log-data-ref :info "deleting context surface: " (ctx-sface :name))
+    (doseq [[attach-pt context-rb] (ctx-sface :attachments)]
+      (when (context-renderbuffer-texture-valid context-rb)
+	(release-opengl-texture-handle gl (context-rb :texture-gl-handle)))
+      (when (context-renderbuffer-valid context-rb)
+	(release-opengl-framebffer-renderbuffer gl (context-rb :gl-handle))))
+    (release-opengl-framebuffer-object gl (ctx-sface :gl-handle))
     ;clear errors in case this was an invalid handle
-    (struct-map context_surface
-      :gl_handle 0
+    (struct-map context-surface
+      :gl-handle 0
       :attachments {}
-      :gl_error (get_gl_error gl))))
+      :gl-error (get-gl-error gl))))
 
-(defn update_context_surface[log_data_ref gl ctx_sface newWidth newHeight]
-  (delete_context_surface log_data_ref gl ctx_sface)
-  (create_context_surface log_data_ref gl (assoc (ctx_sface :surface_spec) :size [newWidth newHeight]) (ctx_sface :name)))
+(defn update-context-surface[log-data-ref gl ctx-sface newWidth newHeight]
+  (delete-context-surface log-data-ref gl ctx-sface)
+  (create-context-surface log-data-ref gl (assoc (ctx-sface :surface-spec) :size [newWidth newHeight]) (ctx-sface :name)))
 
-(defn create_invalid_context_surface [sspec name]
-  (struct-map context_surface 
-	 :gl_handle 0 
-	 :surface_spec sspec 
+(defn create-invalid-context-surface [sspec name]
+  (struct-map context-surface 
+	 :gl-handle 0 
+	 :surface-spec sspec 
 	 :attachments {} 
-	 :framebuffer_status 0
+	 :framebuffer-status 0
 	 :name name))
 
-(defn add_new_context_surface [surfaces_ref sspec name]
+(defn add-new-context-surface [surfaces-ref sspec name]
   (dosync 
-   (let [existing (@surfaces_ref name)]
-     (ref-set surfaces_ref (assoc @surfaces_ref name (create_invalid_context_surface sspec name)))
+   (let [existing (@surfaces-ref name)]
+     (ref-set surfaces-ref (assoc @surfaces-ref name (create-invalid-context-surface sspec name)))
      existing)))
 	 
 ;create a named context surface so you can get at it later.
-(defn create_named_context_surface[log_data_ref gl surfaces_ref sspec name]
-  (let [existing (add_new_context_surface surfaces_ref sspec name)]
+(defn create-named-context-surface[log-data-ref gl surfaces-ref sspec name]
+  (let [existing (add-new-context-surface surfaces-ref sspec name)]
     (when existing
-      (delete_context_surface log_data_ref gl existing))
-    (let [new_surface (create_context_surface log_data_ref gl sspec name)]
-      (dosync (ref-set surfaces_ref (assoc @surfaces_ref name new_surface))))))
+      (delete-context-surface log-data-ref gl existing))
+    (let [new-surface (create-context-surface log-data-ref gl sspec name)]
+      (dosync (ref-set surfaces-ref (assoc @surfaces-ref name new-surface))))))
 
 
 ;only runs if the surface exists already
-(defn update_named_context_surface[log_data_ref gl surfaces_ref name width height]
-  (let [existing (@surfaces_ref name)]
+(defn update-named-context-surface[log-data-ref gl surfaces-ref name width height]
+  (let [existing (@surfaces-ref name)]
     (when existing
-      (let [new_surface (update_context_surface log_data_ref gl existing width height)]
-	(dosync (ref-set surfaces_ref (assoc @surfaces_ref name new_surface)))))))
+      (let [new-surface (update-context-surface log-data-ref gl existing width height)]
+	(dosync (ref-set surfaces-ref (assoc @surfaces-ref name new-surface)))))))
 
-(defn remove_and_return_context_surface [surfaces_ref name]
+(defn remove-and-return-context-surface [surfaces-ref name]
   (dosync
-   (let [existing (@surfaces_ref name)]
-     (ref-set surfaces_ref (dissoc @surfaces_ref name))
+   (let [existing (@surfaces-ref name)]
+     (ref-set surfaces-ref (dissoc @surfaces-ref name))
      existing)))
 
-(defn delete_named_context_surface[log_data_ref gl surfaces_ref name]
-  (let [existing (remove_and_return_context_surface surfaces_ref name)]
-    (delete_context_surface log_data_ref gl existing)))
+(defn delete-named-context-surface[log-data-ref gl surfaces-ref name]
+  (let [existing (remove-and-return-context-surface surfaces-ref name)]
+    (delete-context-surface log-data-ref gl existing)))
 
-(defn create_named_context_surface_seq[log_data_ref gl surfaces_ref sspec_seq name]
+(defn create-named-context-surface-seq[log-data-ref gl surfaces-ref sspec-seq name]
   (first (filter (fn [sspec]
-		   (create_named_context_surface log_data_ref gl surfaces_ref sspec name) ;create the object.  side effect alert.
-		   (= ((@surfaces_ref name) :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)) ;if it is complete, then stop
-		 sspec_seq))
-  (when (not (= ((@surfaces_ref name) :framebuffer_status) GL/GL_FRAMEBUFFER_COMPLETE_EXT))
-    (delete_named_context_surface log_data_ref gl surfaces_ref name))
+		   (create-named-context-surface log-data-ref gl surfaces-ref sspec name) ;create the object.  side effect alert.
+		   (= ((@surfaces-ref name) :framebuffer-status) GL/GL_FRAMEBUFFER_COMPLETE_EXT)) ;if it is complete, then stop
+		 sspec-seq))
+  (when (not (= ((@surfaces-ref name) :framebuffer-status) GL/GL_FRAMEBUFFER_COMPLETE_EXT))
+    (delete-named-context-surface log-data-ref gl surfaces-ref name))
   nil) ;none of the surfaces were complete.  this avoides gl errors...
 
 ;This will re-create or create context surfaces such that they
 ;exactly match the request.
-(defn get_or_create_context_surface[log_data_ref gl surfaces_ref sspec name]
-  (let [existing (@surfaces_ref name)]
-    (if (or (not (context_surface_valid_for_render existing))
-	    (not (= sspec (existing :surface_spec))))
+(defn get-or-create-context-surface[log-data-ref gl surfaces-ref sspec name]
+  (let [existing (@surfaces-ref name)]
+    (if (or (not (context-surface-valid-for-render existing))
+	    (not (= sspec (existing :surface-spec))))
       (do
-	(delete_named_context_surface log_data_ref gl surfaces_ref name)
-	(create_named_context_surface log_data_ref gl surfaces_ref sspec name)
-	(@surfaces_ref name))
+	(delete-named-context-surface log-data-ref gl surfaces-ref name)
+	(create-named-context-surface log-data-ref gl surfaces-ref sspec name)
+	(@surfaces-ref name))
       existing)))
 
 ;bulk re-create the surfaces
-(defn context_surfaces_destroyed[log_data_ref gl surfaces_ref]
-  (let [new_surfaces (mapcat (fn [[name surface]]
-				  [name (create_context_surface log_data_ref gl (surface :surface_spec) (surface :name))])
-			     @surfaces_ref)]
-    (when new_surfaces
-      (dosync (ref-set surfaces_ref (apply assoc @surfaces_ref new_surfaces))))))
+(defn context-surfaces-destroyed[log-data-ref gl surfaces-ref]
+  (let [new-surfaces (mapcat (fn [[name surface]]
+				  [name (create-context-surface log-data-ref gl (surface :surface-spec) (surface :name))])
+			     @surfaces-ref)]
+    (when new-surfaces
+      (dosync (ref-set surfaces-ref (apply assoc @surfaces-ref new-surfaces))))))

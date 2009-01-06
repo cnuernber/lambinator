@@ -1,205 +1,205 @@
 (in-ns 'lambinator.rcgl)
 
-(defn rcgl_glsl_log [log_data_ref type & args]
-  (when log_data_ref
-    (log_message @log_data_ref "rcgl.glsl:" type args)))
+(defn rcgl-glsl-log [log-data-ref type & args]
+  (when log-data-ref
+    (log-message @log-data-ref "rcgl.glsl:" type args)))
 
-(defstruct rcgl_glsl_item :name :index :size :datatype :datatype_name ) ;either an attribute or a uniform
+(defstruct rcgl-glsl-item :name :index :size :datatype :datatype-name ) ;either an attribute or a uniform
 
-(def rcgl_glsl_shader_status [:valid :invalid :unused] )
+(def rcgl-glsl-shader-status [:valid :invalid :unused] )
 ;creates a hash of the shader text so we can identity different shaders
-(defstruct rcgl_glsl_shader :gl_handle :gl_log :filename :md5_hash :status :gl_error ) ;either vertex or fragment
+(defstruct rcgl-glsl-shader :gl-handle :gl-log :filename :md5-hash :status :gl-error ) ;either vertex or fragment
 
-(def rcgl_glsl_program_status [:valid :loading :invalid :unused])
+(def rcgl-glsl-program-status [:valid :loading :invalid :unused])
 
-(defstruct rcgl_glsl_program :vert_shader :frag_shader 
-	   :gl_handle :gl_log :name :uniforms :attributes
-	   :status :gl_error ) ;combination of the two
+(defstruct rcgl-glsl-program :vert-shader :frag-shader 
+	   :gl-handle :gl-log :name :uniforms :attributes
+	   :status :gl-error ) ;combination of the two
 
 ;takes a filename and returns the gl constant that stands for the
 ;shader type.  This expects functions to end with glslv or glslf
-(defn get_glsl_type_from_fname [fname]
+(defn get-glsl-type-from-fname [fname]
   (if (. fname endsWith "glslv" )
     GL/GL_VERTEX_SHADER
     GL/GL_FRAGMENT_SHADER))
 
 
-(defn glsl_shader_valid[shader]
+(defn glsl-shader-valid[shader]
   (if (and shader
 	   (= (shader :status) :valid)
-	   (> (shader :gl_handle) 0))
+	   (> (shader :gl-handle) 0))
     true
     false))
 
 ;;when marking a program as unused we null out everything.
-(defn glsl_program_unused [prog]
+(defn glsl-program-unused [prog]
   (= (prog :status) :unused))
 
-(defn glsl_program_valid [prog]
+(defn glsl-program-valid [prog]
   (and prog
        (= (prog :status) :valid)
-       (> (prog :gl_handle) 0)))
+       (> (prog :gl-handle) 0)))
 
 ;takes a lambda whos arguments match
-;info_fn takes two arguments, an array and an offset
-;log_data_fn takes 4 arguments, a length array, an offset
+;info-fn takes two arguments, an array and an offset
+;log-data-fn takes 4 arguments, a length array, an offset
 ;a byte array and another offset
-(defn get_log_info [info_fn log_data_fn]
-  (let [info_args (make-array Integer/TYPE 1)]
-    (info_fn info_args 0)
-    (let [info_len (aget info_args 0)
-	  bytes (make-array Byte/TYPE info_len)
-	  log_lengths (make-array Integer/TYPE 1)]
-      (aset log_lengths 0 info_len)
-      (if (> info_len 0)
+(defn get-log-info [info-fn log-data-fn]
+  (let [info-args (make-array Integer/TYPE 1)]
+    (info-fn info-args 0)
+    (let [info-len (aget info-args 0)
+	  bytes (make-array Byte/TYPE info-len)
+	  log-lengths (make-array Integer/TYPE 1)]
+      (aset log-lengths 0 info-len)
+      (if (> info-len 0)
 	(do
-	  (log_data_fn info_len log_lengths 0 bytes 0)
-	  (String. bytes 0 (aget log_lengths 0)))
+	  (log-data-fn info-len log-lengths 0 bytes 0)
+	  (String. bytes 0 (aget log-lengths 0)))
 	""))))
       
 ;this works for program info that returns a single long.
-(defn get_gl_program_int_variable[gl program var_name]
-  (allocate_gl_item
+(defn get-gl-program-int-variable[gl program var-name]
+  (allocate-gl-item
    (fn [count args offset]
-     (. gl glGetProgramiv program var_name args offset))))
+     (. gl glGetProgramiv program var-name args offset))))
 
-(defn get_gl_shader_int_variable[gl shader var_name]
-  (allocate_gl_item
+(defn get-gl-shader-int-variable[gl shader var-name]
+  (allocate-gl-item
    (fn [count args offset]
-     (. gl glGetShaderiv shader var_name args offset))))
+     (. gl glGetShaderiv shader var-name args offset))))
 	  
 
-(defn create_glsl_shader [log_data_ref gl bytes filename md5_hash]
-  (rcgl_glsl_log log_data_ref :info "creating shader: " filename)
-  (let [type (get_glsl_type_from_fname filename)
+(defn create-glsl-shader [log-data-ref gl bytes filename md5-hash]
+  (rcgl-glsl-log log-data-ref :info "creating shader: " filename)
+  (let [type (get-glsl-type-from-fname filename)
 	shader (. gl glCreateShader type)
-	str_data (String. bytes)
-	str_array (make-array String 1)
-	len_array (make-array Integer/TYPE 1)]
-    (aset str_array 0 str_data)
-    (aset len_array 0 (. str_data length))
-    (. gl glShaderSource shader 1 str_array len_array 0)
+	str-data (String. bytes)
+	str-array (make-array String 1)
+	len-array (make-array Integer/TYPE 1)]
+    (aset str-array 0 str-data)
+    (aset len-array 0 (. str-data length))
+    (. gl glShaderSource shader 1 str-array len-array 0)
     (. gl glCompileShader shader)
-    (let [log_str (get_log_info
-		   (fn [info_args offset] (. gl glGetShaderiv shader GL/GL_INFO_LOG_LENGTH info_args offset))
-		   (fn [log_len log_lengths len_off log_bytes byte_off] 
-		     (. gl glGetShaderInfoLog shader log_len log_lengths len_off log_bytes byte_off)))
-	  compile_status (get_gl_shader_int_variable gl shader GL/GL_COMPILE_STATUS)
-	  shader_status (if (== compile_status GL/GL_TRUE) :valid :invalid)
-	  shader (if (= shader_status :invalid) ;clean up resources for failed compile.
+    (let [log-str (get-log-info
+		   (fn [info-args offset] (. gl glGetShaderiv shader GL/GL_INFO_LOG_LENGTH info-args offset))
+		   (fn [log-len log-lengths len-off log-bytes byte-off] 
+		     (. gl glGetShaderInfoLog shader log-len log-lengths len-off log-bytes byte-off)))
+	  compile-status (get-gl-shader-int-variable gl shader GL/GL_COMPILE_STATUS)
+	  shader-status (if (== compile-status GL/GL_TRUE) :valid :invalid)
+	  shader (if (= shader-status :invalid) ;clean up resources for failed compile.
 		   (do
 		     (. gl glDeleteShader shader)
 		     0)
 		   shader )]
-      (struct-map rcgl_glsl_shader 
-	:gl_handle shader 
-	:gl_log log_str 
+      (struct-map rcgl-glsl-shader 
+	:gl-handle shader 
+	:gl-log log-str 
 	:filename filename 
-	:md5_hash md5_hash 
-	:status shader_status 
-	:gl_error (get_gl_error gl)))))
+	:md5-hash md5-hash 
+	:status shader-status 
+	:gl-error (get-gl-error gl)))))
 
 
-(defn delete_glsl_shader[log_data_ref gl shader]
-  (when (glsl_shader_valid shader)
-    (rcgl_glsl_log log_data_ref :info "deleting shader: " (shader :filename))
-    (. gl glDeleteShader (shader :gl_handle))
-    (assoc shader :gl_handle 0 :status :unused)))
+(defn delete-glsl-shader[log-data-ref gl shader]
+  (when (glsl-shader-valid shader)
+    (rcgl-glsl-log log-data-ref :info "deleting shader: " (shader :filename))
+    (. gl glDeleteShader (shader :gl-handle))
+    (assoc shader :gl-handle 0 :status :unused)))
 
 ;the test fun does all the loading in the gl thread.
 ;Normally I wouldn't do it like this, as I wouldn't want the
 ;render thread to be held up loading files of indefinite
 ;size.
-(defn test_create_glsl_shader_from_file [log_data_ref gl filename]
-  (let [bytes (fs_load_file filename)
-	md5 (fs_md5_hash bytes)]
-    (create_glsl_shader log_data_ref gl bytes filename md5 (list filename))))
+(defn test-create-glsl-shader-from-file [log-data-ref gl filename]
+  (let [bytes (fs-load-file filename)
+	md5 (fs-md5-hash bytes)]
+    (create-glsl-shader log-data-ref gl bytes filename md5 (list filename))))
 
 
-(defn create_invalid_glsl_program [glslv_filename glslf_filename prog_name]
-  (struct-map rcgl_glsl_program 
+(defn create-invalid-glsl-program [glslv-filename glslf-filename prog-name]
+  (struct-map rcgl-glsl-program 
     :status :invalid
-    :vert_shader (struct-map rcgl_glsl_shader :filename glslv_filename :status :invalid)
-    :frag_shader (struct-map rcgl_glsl_shader :filename glslf_filename :status :invalid)
-    :name prog_name))
+    :vert-shader (struct-map rcgl-glsl-shader :filename glslv-filename :status :invalid)
+    :frag-shader (struct-map rcgl-glsl-shader :filename glslf-filename :status :invalid)
+    :name prog-name))
 
-(defmacro glsl_get_program_items [gl program active_int max_name_len_int get_mber_fn]
-  (let [item_count (gensym)
-	max_name_len (gensym)
-	name_byte_buf (gensym)
-	len_buf (gensym)
-	size_buf (gensym)
-	type_buf (gensym)
+(defmacro glsl-get-program-items [gl program active-int max-name-len-int get-mber-fn]
+  (let [item-count (gensym)
+	max-name-len (gensym)
+	name-byte-buf (gensym)
+	len-buf (gensym)
+	size-buf (gensym)
+	type-buf (gensym)
 	idx (gensym)
 	item (gensym)]
-    `(let [~item_count (get_gl_program_int_variable ~gl ~program ~active_int)
-	   ~max_name_len (get_gl_program_int_variable ~gl ~program ~max_name_len_int)
-	   ~name_byte_buf (make-array Byte/TYPE ~max_name_len)
-	   ~len_buf (make-array Integer/TYPE 1)
-	   ~size_buf (make-array Integer/TYPE 1)
-	   ~type_buf (make-array Integer/TYPE 1)]
+    `(let [~item-count (get-gl-program-int-variable ~gl ~program ~active-int)
+	   ~max-name-len (get-gl-program-int-variable ~gl ~program ~max-name-len-int)
+	   ~name-byte-buf (make-array Byte/TYPE ~max-name-len)
+	   ~len-buf (make-array Integer/TYPE 1)
+	   ~size-buf (make-array Integer/TYPE 1)
+	   ~type-buf (make-array Integer/TYPE 1)]
        ;found a hard bug in here.  The map returns a lazy seq.  Thus if you access it
        ;from outside the gl thread then you cause a bus error and java completely crashes.
        ;for evaluation of anything in these files lazyiness is definitely not your friend.
        (apply hash-map (doall (mapcat (fn [~item] [(~item :name) ~item]) 
 				      (map (fn [~idx] 
-					     (. ~gl ~get_mber_fn ~program ~idx ~max_name_len ~len_buf 0 ~size_buf 0 ~type_buf 0 ~name_byte_buf 0)
-					     (struct rcgl_glsl_item 
-						     (String. ~name_byte_buf 0 (aget ~len_buf 0)) 
-						     ~idx (aget ~size_buf 0) (aget ~type_buf 0)
-						     (get_opengl_constant_name (aget ~type_buf 0))))
-					   (range ~item_count))))))))
+					     (. ~gl ~get-mber-fn ~program ~idx ~max-name-len ~len-buf 0 ~size-buf 0 ~type-buf 0 ~name-byte-buf 0)
+					     (struct rcgl-glsl-item 
+						     (String. ~name-byte-buf 0 (aget ~len-buf 0)) 
+						     ~idx (aget ~size-buf 0) (aget ~type-buf 0)
+						     (get-opengl-constant-name (aget ~type-buf 0))))
+					   (range ~item-count))))))))
 
 ;returns a program if the underlying shaders were created successfully
-(defn create_glsl_program[log_data_ref gl vert_shader frag_shader name]
-  (rcgl_glsl_log log_data_ref :info "creating program: " name)
+(defn create-glsl-program[log-data-ref gl vert-shader frag-shader name]
+  (rcgl-glsl-log log-data-ref :info "creating program: " name)
   (let [program (. gl glCreateProgram)]
-    (. gl glAttachShader program (vert_shader :gl_handle))
-    (. gl glAttachShader program (frag_shader :gl_handle))
+    (. gl glAttachShader program (vert-shader :gl-handle))
+    (. gl glAttachShader program (frag-shader :gl-handle))
     (. gl glLinkProgram program)
-    (let [log_str (get_log_info
-		   (fn [info_args offset] (. gl glGetProgramiv program GL/GL_INFO_LOG_LENGTH info_args offset))
-		   (fn [log_len log_lengths log_ff log_bytes byte_off]
-		     (. gl glGetProgramInfoLog program log_len log_lengths log_ff log_bytes byte_off)))
-	  link_status (get_gl_program_int_variable gl program GL/GL_LINK_STATUS)
-	  retval (struct rcgl_glsl_program vert_shader frag_shader program log_str name [] [] :invalid)]
+    (let [log-str (get-log-info
+		   (fn [info-args offset] (. gl glGetProgramiv program GL/GL_INFO_LOG_LENGTH info-args offset))
+		   (fn [log-len log-lengths log-ff log-bytes byte-off]
+		     (. gl glGetProgramInfoLog program log-len log-lengths log-ff log-bytes byte-off)))
+	  link-status (get-gl-program-int-variable gl program GL/GL_LINK_STATUS)
+	  retval (struct rcgl-glsl-program vert-shader frag-shader program log-str name [] [] :invalid)]
       ;if it linked successfully then we check out its uniform variables and its attributes
-      (if (== link_status GL/GL_TRUE) 
-	(let [attributes (glsl_get_program_items gl program GL/GL_ACTIVE_ATTRIBUTES GL/GL_ACTIVE_ATTRIBUTE_MAX_LENGTH glGetActiveAttrib)
-	      uniforms (glsl_get_program_items gl program GL/GL_ACTIVE_UNIFORMS GL/GL_ACTIVE_UNIFORM_MAX_LENGTH glGetActiveUniform)]
-	  (assoc retval :attributes attributes :uniforms uniforms :status :valid :gl_error (get_gl_error gl)))
+      (if (== link-status GL/GL_TRUE) 
+	(let [attributes (glsl-get-program-items gl program GL/GL_ACTIVE_ATTRIBUTES GL/GL_ACTIVE_ATTRIBUTE_MAX_LENGTH glGetActiveAttrib)
+	      uniforms (glsl-get-program-items gl program GL/GL_ACTIVE_UNIFORMS GL/GL_ACTIVE_UNIFORM_MAX_LENGTH glGetActiveUniform)]
+	  (assoc retval :attributes attributes :uniforms uniforms :status :valid :gl-error (get-gl-error gl)))
 	(do
 	  (. gl glDeleteProgram program) ;clean up resources for failed compile
-	  (assoc retval :gl_handle 0 :gl_error (get_gl_error gl)))))))
+	  (assoc retval :gl-handle 0 :gl-error (get-gl-error gl)))))))
 
-(defn delete_glsl_program[log_data_ref gl program]
-  (when (glsl_program_valid program)
-    (rcgl_glsl_log log_data_ref :info "deleting program: " (program :name))
-    (. gl glDeleteProgram (program :gl_handle))
-    (assoc program :gl_handle 0 :status :unused :gl_error (get_gl_error gl)))) ;note that this says nothing about the shaders
+(defn delete-glsl-program[log-data-ref gl program]
+  (when (glsl-program-valid program)
+    (rcgl-glsl-log log-data-ref :info "deleting program: " (program :name))
+    (. gl glDeleteProgram (program :gl-handle))
+    (assoc program :gl-handle 0 :status :unused :gl-error (get-gl-error gl)))) ;note that this says nothing about the shaders
 
-(defmulti set_glsl_uniform (fn [log_data_ref gl uniform_entry var_value] (uniform_entry :datatype)))
+(defmulti set-glsl-uniform (fn [log-data-ref gl uniform-entry var-value] (uniform-entry :datatype)))
 ;should log that nothing got set.
-(defmethod set_glsl_uniform :default [log_data_ref gl uniform_entry var_value] 
-  (rcgl_glsl_log log_data_ref :diagnostic "unrecognized uniform type: " (uniform_entry :datatype)))
-(defmethod set_glsl_uniform GL/GL_FLOAT [log_data_ref #^GL gl entry var_value]
-  (. gl glUniform1f (entry :index) var_value))
+(defmethod set-glsl-uniform :default [log-data-ref gl uniform-entry var-value] 
+  (rcgl-glsl-log log-data-ref :diagnostic "unrecognized uniform type: " (uniform-entry :datatype)))
+(defmethod set-glsl-uniform GL/GL_FLOAT [log-data-ref #^GL gl entry var-value]
+  (. gl glUniform1f (entry :index) var-value))
 ;You set the sample to the logical tex unit.
 ;Example, if you do
 ;glActiveTexture GL_TEXTURE5
 ;you set the sampler to 5.  Not GL_TEXTURE5.
-(defmethod set_glsl_uniform GL/GL_SAMPLER_2D [log_data_ref #^GL gl entry var_value]
-  (. gl glUniform1i (entry :index) var_value))
+(defmethod set-glsl-uniform GL/GL_SAMPLER_2D [log-data-ref #^GL gl entry var-value]
+  (. gl glUniform1i (entry :index) var-value))
 
-(defmethod set_glsl_uniform GL/GL_INT [log_data_ref #^GL gl entry var_value]
-  (. gl glUniform1i (entry :index) var_value))
+(defmethod set-glsl-uniform GL/GL_INT [log-data-ref #^GL gl entry var-value]
+  (. gl glUniform1i (entry :index) var-value))
 
-(defn set_glsl_prog_uniforms [log_data_ref gl var_pair_seq rcgl_glsl_program]
-  (let [{ gl_handle :gl_handle uniforms :uniforms } rcgl_glsl_program]
-    (doseq [[vname vvalue] var_pair_seq]
-      (let [uniform_entry (uniforms vname)]
-	(when uniform_entry
-	  (set_glsl_uniform log_data_ref gl uniform_entry vvalue))))))
+(defn set-glsl-prog-uniforms [log-data-ref gl var-pair-seq rcgl-glsl-program]
+  (let [{ gl-handle :gl-handle uniforms :uniforms } rcgl-glsl-program]
+    (doseq [[vname vvalue] var-pair-seq]
+      (let [uniform-entry (uniforms vname)]
+	(when uniform-entry
+	  (set-glsl-uniform log-data-ref gl uniform-entry vvalue))))))
 
 
 
@@ -217,200 +217,200 @@
 ;able to delete programs without the underlying shader
 ;objects being affected.
 
-(defn update_shaders_with_new_shader [log_data_ref gl shaders_ref new_shader]
-  (let [fname (new_shader :filename)
-	existing (@shaders_ref fname)]
+(defn update-shaders-with-new-shader [log-data-ref gl shaders-ref new-shader]
+  (let [fname (new-shader :filename)
+	existing (@shaders-ref fname)]
     (when existing
-      (delete_glsl_shader log_data_ref gl existing))
-    (dosync (ref-set shaders_ref (assoc @shaders_ref fname new_shader)))))
+      (delete-glsl-shader log-data-ref gl existing))
+    (dosync (ref-set shaders-ref (assoc @shaders-ref fname new-shader)))))
 
 ;You should replace the program if the update shader is valid
 ;and its shaders is not valid or the md5 hash doesn't match
-(defn should_replace_program[prog_shader update_shader]
-  (and (glsl_shader_valid update_shader)
-       (or (not (glsl_shader_valid prog_shader))
-	   (not (= (prog_shader :md5_hash) (update_shader :md5_hash))))))
+(defn should-replace-program[prog-shader update-shader]
+  (and (glsl-shader-valid update-shader)
+       (or (not (glsl-shader-valid prog-shader))
+	   (not (= (prog-shader :md5-hash) (update-shader :md5-hash))))))
 
-(defn return_valid_shader[prog_shader update_shader]
-  (if (glsl_shader_valid update_shader)
-    update_shader
-    prog_shader))
+(defn return-valid-shader[prog-shader update-shader]
+  (if (glsl-shader-valid update-shader)
+    update-shader
+    prog-shader))
 
-(defn program_should_be_updated[program shaders]
-  (let [prog_vs (program :vert_shader)
-	prog_fs (program :frag_shader)
-	update_vs (shaders (prog_vs :filename))
-	update_fs (shaders (prog_fs :filename))]
-    (or (should_replace_program prog_vs update_vs)
-	(should_replace_program prog_fs update_fs))))
+(defn program-should-be-updated[program shaders]
+  (let [prog-vs (program :vert-shader)
+	prog-fs (program :frag-shader)
+	update-vs (shaders (prog-vs :filename))
+	update-fs (shaders (prog-fs :filename))]
+    (or (should-replace-program prog-vs update-vs)
+	(should-replace-program prog-fs update-fs))))
 
-(defn update_program[log_data_ref gl shaders program]
-  (let [prog_vs (program :vert_shader)
-	prog_fs (program :frag_shader)
-	update_vs (shaders (prog_vs :filename))
-	update_fs (shaders (prog_fs :filename))
+(defn update-program[log-data-ref gl shaders program]
+  (let [prog-vs (program :vert-shader)
+	prog-fs (program :frag-shader)
+	update-vs (shaders (prog-vs :filename))
+	update-fs (shaders (prog-fs :filename))
 	name (program :name)
-	vs (return_valid_shader prog_vs update_vs)
-	fs (return_valid_shader prog_fs update_fs)
-	valid_pair (and (glsl_shader_valid vs)(glsl_shader_valid fs))
-	compile_program (if valid_pair
-			  (create_glsl_program log_data_ref gl vs fs name)
+	vs (return-valid-shader prog-vs update-vs)
+	fs (return-valid-shader prog-fs update-fs)
+	valid-pair (and (glsl-shader-valid vs)(glsl-shader-valid fs))
+	compile-program (if valid-pair
+			  (create-glsl-program log-data-ref gl vs fs name)
 			  program)
-	compile_valid (glsl_program_valid compile_program)
-	retval (if compile_valid
+	compile-valid (glsl-program-valid compile-program)
+	retval (if compile-valid
 		 (do
-		   (delete_glsl_program log_data_ref gl program) ;if the new program is valid, delete the old program
-		   compile_program)
+		   (delete-glsl-program log-data-ref gl program) ;if the new program is valid, delete the old program
+		   compile-program)
 		 program)] ;if the compiled prog isn't valid, return the original
-    (when (and valid_pair (not compile_valid))
-      (rcgl_glsl_log log_data_ref :diagnostic "Failed to compile program: " name)
-      (rcgl_glsl_log log_data_ref :diagnostic (compile_program :gl_log)))
+    (when (and valid-pair (not compile-valid))
+      (rcgl-glsl-log log-data-ref :diagnostic "Failed to compile program: " name)
+      (rcgl-glsl-log log-data-ref :diagnostic (compile-program :gl-log)))
     retval ))
 
 ;take the map of programs, and update every one that has a mismatched shader specification
-;from the master shaders_ref map
-(defn update_programs[log_data_ref gl programs_ref shaders_ref]
-  (let [shaders @shaders_ref 
-	programs_that_matter (filter 
-			      (fn [[name program]] (program_should_be_updated program shaders))
-			      @programs_ref) ;programs that don't need updating don't matter
+;from the master shaders-ref map
+(defn update-programs[log-data-ref gl programs-ref shaders-ref]
+  (let [shaders @shaders-ref 
+	programs-that-matter (filter 
+			      (fn [[name program]] (program-should-be-updated program shaders))
+			      @programs-ref) ;programs that don't need updating don't matter
 	;force non-lazy execution as these functions access opengl
-	new_programs_list (doall (mapcat
-				  (fn [[name program]] [name (update_program log_data_ref gl shaders program)])
-				  programs_that_matter))] ;out of the programs that matter, do the update
-    (when new_programs_list ;mix the new data into the programs list		
-      (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs_list))))))
+	new-programs-list (doall (mapcat
+				  (fn [[name program]] [name (update-program log-data-ref gl shaders program)])
+				  programs-that-matter))] ;out of the programs that matter, do the update
+    (when new-programs-list ;mix the new data into the programs list		
+      (dosync (ref-set programs-ref (apply assoc @programs-ref new-programs-list))))))
 				     
 
-(defn finish_shader_load [log_data_ref drawable programs_ref shaders_ref bytes filename md5_hash]
+(defn finish-shader-load [log-data-ref drawable programs-ref shaders-ref bytes filename md5-hash]
   (let [gl (. drawable getGL)
-	existing (@shaders_ref filename)
-	md5_matches (if existing
-		      (= md5_hash (existing :md5_hash))
+	existing (@shaders-ref filename)
+	md5-matches (if existing
+		      (= md5-hash (existing :md5-hash))
 		      false)]
-    (when (not md5_matches)
-      (let [new_shader (create_glsl_shader log_data_ref gl bytes filename md5_hash)
-	    shader_valid (glsl_shader_valid new_shader)]
-	(if shader_valid
+    (when (not md5-matches)
+      (let [new-shader (create-glsl-shader log-data-ref gl bytes filename md5-hash)
+	    shader-valid (glsl-shader-valid new-shader)]
+	(if shader-valid
 	  (do 
-	    (update_shaders_with_new_shader log_data_ref gl shaders_ref new_shader)
-	    (update_programs log_data_ref gl programs_ref shaders_ref))
+	    (update-shaders-with-new-shader log-data-ref gl shaders-ref new-shader)
+	    (update-programs log-data-ref gl programs-ref shaders-ref))
 	  (do
-	    (rcgl_glsl_log log_data_ref :diagnostic "Failed to compile shader: " filename)
-	    (rcgl_glsl_log log_data_ref :diagnostic (new_shader :gl_log))))))))
+	    (rcgl-glsl-log log-data-ref :diagnostic "Failed to compile shader: " filename)
+	    (rcgl-glsl-log log-data-ref :diagnostic (new-shader :gl-log))))))))
 
 ;force a shader load of the given filename.
 ;then this completes, if the md5 hash is different it will rebuild
 ;all programs that are using this filename as either a vertex or fragment
 ;shader
-(defn begin_shader_load [log_data_ref programs_ref shaders_ref loading_system render_tasks_ref filename]
-  (let [finish_fn (fn [bytes filename md5_hash] ;when the file is done, add a new render task to load the shader and update
+(defn begin-shader-load [log-data-ref programs-ref shaders-ref loading-system render-tasks-ref filename]
+  (let [finish-fn (fn [bytes filename md5-hash] ;when the file is done, add a new render task to load the shader and update
 		    (dosync (ref-set            ;any programs that need updating
-			     render_tasks_ref 
-			     (conj @render_tasks_ref #(finish_shader_load log_data_ref % programs_ref shaders_ref bytes filename md5_hash)))))]
-    (fs_add_load_task loading_system filename finish_fn)))
+			     render-tasks-ref 
+			     (conj @render-tasks-ref #(finish-shader-load log-data-ref % programs-ref shaders-ref bytes filename md5-hash)))))]
+    (fs-add-load-task loading-system filename finish-fn)))
 
-;keyword stands for either :vert_shader or :frag_shader
+;keyword stands for either :vert-shader or :frag-shader
 ;This will begin the shader loading if the existing shader isn't valid.
-(defn maybe_begin_shader_load [log_data_ref programs_ref shaders_ref loading_system render_tasks_ref filename existing_shader]
-  (when (not (glsl_shader_valid existing_shader))
-    (begin_shader_load log_data_ref programs_ref shaders_ref loading_system render_tasks_ref filename)))
+(defn maybe-begin-shader-load [log-data-ref programs-ref shaders-ref loading-system render-tasks-ref filename existing-shader]
+  (when (not (glsl-shader-valid existing-shader))
+    (begin-shader-load log-data-ref programs-ref shaders-ref loading-system render-tasks-ref filename)))
 
 ;add a new program and return the existing one if it exists.  Must be called from render thread
-(defn add_new_glsl_program[log_data_ref gl programs_ref shaders_ref loading_system render_tasks_ref glslv_filename glslf_filename prog_name]
-  (let [existing (@programs_ref prog_name)
-	vs (@shaders_ref glslv_filename)
-	fs (@shaders_ref glslf_filename)
-	matches_exactly (and existing
-			     (= ((existing :vert_shader) :filename) glslv_filename)
-			     (= ((existing :frag_shader) :filename) glslf_filename))]
-    (maybe_begin_shader_load log_data_ref programs_ref shaders_ref loading_system render_tasks_ref glslv_filename vs)
-    (maybe_begin_shader_load log_data_ref programs_ref shaders_ref loading_system render_tasks_ref glslf_filename fs)
+(defn add-new-glsl-program[log-data-ref gl programs-ref shaders-ref loading-system render-tasks-ref glslv-filename glslf-filename prog-name]
+  (let [existing (@programs-ref prog-name)
+	vs (@shaders-ref glslv-filename)
+	fs (@shaders-ref glslf-filename)
+	matches-exactly (and existing
+			     (= ((existing :vert-shader) :filename) glslv-filename)
+			     (= ((existing :frag-shader) :filename) glslf-filename))]
+    (maybe-begin-shader-load log-data-ref programs-ref shaders-ref loading-system render-tasks-ref glslv-filename vs)
+    (maybe-begin-shader-load log-data-ref programs-ref shaders-ref loading-system render-tasks-ref glslf-filename fs)
     
-    (when (not matches_exactly)
-      (dosync (ref-set programs_ref (assoc @programs_ref prog_name (create_invalid_glsl_program glslv_filename glslf_filename prog_name))))
+    (when (not matches-exactly)
+      (dosync (ref-set programs-ref (assoc @programs-ref prog-name (create-invalid-glsl-program glslv-filename glslf-filename prog-name))))
       (when existing
-	(delete_glsl_program log_data_ref gl existing)))
-    (when (and (glsl_shader_valid vs) (glsl_shader_valid fs))
-      (update_programs log_data_ref gl programs_ref shaders_ref))))
+	(delete-glsl-program log-data-ref gl existing)))
+    (when (and (glsl-shader-valid vs) (glsl-shader-valid fs))
+      (update-programs log-data-ref gl programs-ref shaders-ref))))
 
 ;from a reference to known programs
 ;filenames should be canonical
-;render_tasks are things that should happen *before* the next render pass
+;render-tasks are things that should happen *before* the next render pass
 ;Returns the index of the new program so you can use refer to it later.
 ;OK to call asynchronously
 ;do not call this function with files that don't exist.
 ;I am not certain what will happen, but they will probably silently fail as the loader
 ;silently ignores files that don't exist.
-(defn create_glsl_program_from_files [log_data_ref programs_ref shaders_ref loading_system render_tasks_ref glslv_filename glslf_filename prog_name]
-  (dosync (ref-set render_tasks_ref 
-		   (conj @render_tasks_ref 
+(defn create-glsl-program-from-files [log-data-ref programs-ref shaders-ref loading-system render-tasks-ref glslv-filename glslf-filename prog-name]
+  (dosync (ref-set render-tasks-ref 
+		   (conj @render-tasks-ref 
 			 (fn [drawable]
-			   (add_new_glsl_program log_data_ref (. drawable getGL) programs_ref shaders_ref loading_system render_tasks_ref 
-						 glslv_filename glslf_filename prog_name))))))
+			   (add-new-glsl-program log-data-ref (. drawable getGL) programs-ref shaders-ref loading-system render-tasks-ref 
+						 glslv-filename glslf-filename prog-name))))))
 
 ;This happens if you change your window resolution or (using GLJpanel) just resize
 ;the window too far out of what it expects.
 ;This just does a blocking load of resources until it gets what it wants
 ;in the render thread.
-(defn resources_released_reload_all_glsl_programs[log_data_ref drawable programs_ref shaders_ref]
+(defn resources-released-reload-all-glsl-programs[log-data-ref drawable programs-ref shaders-ref]
   (let [gl (. drawable getGL)
-	new_shaders (doall (mapcat (fn [[name shader]]
-				     (let [bytes (fs_load_item name)
-					   hash (fs_md5_hash bytes)]
-				       [name (create_glsl_shader log_data_ref gl bytes name hash)]))
-				   @shaders_ref))
-	new_programs (mapcat (fn [[name prog]]
-			       (let [{ { glslv :filename } :vert_shader { glslf :filename } :frag_shader name :name } prog]
-				 [name (create_invalid_glsl_program glslv glslf name)]))
-			     @programs_ref)]
-    (when new_shaders
-      (dosync (ref-set shaders_ref (apply assoc @shaders_ref new_shaders))))
-    (when new_programs
-      (dosync (ref-set programs_ref (apply assoc @programs_ref new_programs))))
-    (update_programs log_data_ref gl programs_ref shaders_ref)))
+	new-shaders (doall (mapcat (fn [[name shader]]
+				     (let [bytes (fs-load-item name)
+					   hash (fs-md5-hash bytes)]
+				       [name (create-glsl-shader log-data-ref gl bytes name hash)]))
+				   @shaders-ref))
+	new-programs (mapcat (fn [[name prog]]
+			       (let [{ { glslv :filename } :vert-shader { glslf :filename } :frag-shader name :name } prog]
+				 [name (create-invalid-glsl-program glslv glslf name)]))
+			     @programs-ref)]
+    (when new-shaders
+      (dosync (ref-set shaders-ref (apply assoc @shaders-ref new-shaders))))
+    (when new-programs
+      (dosync (ref-set programs-ref (apply assoc @programs-ref new-programs))))
+    (update-programs log-data-ref gl programs-ref shaders-ref)))
 
-(defn glsl_shader_in_use[programs_ref filename]
-  (let [using_progs (filter (fn[[name program]]
-				(or (= ((program :vert_shader) :filename) filename)
-				    (= ((program :frag_shader) :filename) filename)))
-			    @programs_ref)]
-    (not (= (first using_progs) nil)))) ;;if there is at least one program using this.
+(defn glsl-shader-in-use[programs-ref filename]
+  (let [using-progs (filter (fn[[name program]]
+				(or (= ((program :vert-shader) :filename) filename)
+				    (= ((program :frag-shader) :filename) filename)))
+			    @programs-ref)]
+    (not (= (first using-progs) nil)))) ;;if there is at least one program using this.
 
-(defn remove_and_return_item[map_ref key]
+(defn remove-and-return-item[map-ref key]
   (dosync
-   (let [item (@map_ref key)]
-     (dosync (ref-set map_ref (dissoc @map_ref key)))
+   (let [item (@map-ref key)]
+     (dosync (ref-set map-ref (dissoc @map-ref key)))
      item )))
 
-(defn remove_shader_if_not_in_use[programs_ref shaders_ref filename]
+(defn remove-shader-if-not-in-use[programs-ref shaders-ref filename]
   (dosync
-   (let [shader (@shaders_ref filename)]
+   (let [shader (@shaders-ref filename)]
      (if (and shader 
-	      (not (glsl_shader_in_use programs_ref filename)))
+	      (not (glsl-shader-in-use programs-ref filename)))
        (do
-	 (dosync (ref-set shaders_ref (dissoc @shaders_ref filename)))
+	 (dosync (ref-set shaders-ref (dissoc @shaders-ref filename)))
 	 shader)
        nil ))))
 
-(defn check_delete_glsl_shader[log_data_ref drawable programs_ref shaders_ref filename]
-  (let [shader (remove_shader_if_not_in_use programs_ref shaders_ref filename)]
+(defn check-delete-glsl-shader[log-data-ref drawable programs-ref shaders-ref filename]
+  (let [shader (remove-shader-if-not-in-use programs-ref shaders-ref filename)]
     (when shader
-      (delete_glsl_shader log_data_ref (. drawable getGL) shader))))
+      (delete-glsl-shader log-data-ref (. drawable getGL) shader))))
     
 
-(defn delete_rcgl_glsl_program_and_shaders[log_data_ref drawable programs_ref shaders_ref prog_name]
-  (let [program (remove_and_return_item programs_ref prog_name)]
+(defn delete-rcgl-glsl-program-and-shaders[log-data-ref drawable programs-ref shaders-ref prog-name]
+  (let [program (remove-and-return-item programs-ref prog-name)]
     (when program
       (let [gl (. drawable getGL)
-	    glslv ((program :vert_shader) :filename)
-	    glslf ((program :frag_shader) :filename)]
-	(delete_glsl_program log_data_ref gl program)
-	(check_delete_glsl_shader log_data_ref drawable programs_ref shaders_ref glslv)
-	(check_delete_glsl_shader log_data_ref drawable programs_ref shaders_ref glslf)))))
+	    glslv ((program :vert-shader) :filename)
+	    glslf ((program :frag-shader) :filename)]
+	(delete-glsl-program log-data-ref gl program)
+	(check-delete-glsl-shader log-data-ref drawable programs-ref shaders-ref glslv)
+	(check-delete-glsl-shader log-data-ref drawable programs-ref shaders-ref glslf)))))
 	    
 
 
-(defstruct rcgl_glsl_manager :programs_ref :shaders_ref)
-(defn create_rcgl_glsl_manager [] 
-  (struct rcgl_glsl_manager (ref {}) (ref {})))
+(defstruct rcgl-glsl-manager :programs-ref :shaders-ref)
+(defn create-rcgl-glsl-manager [] 
+  (struct rcgl-glsl-manager (ref {}) (ref {})))

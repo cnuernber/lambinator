@@ -14,61 +14,61 @@
 ;updater sets the component to the current value specified by getter
 ;getter gets current value from the model
 ;setter is used to set the item 
-(defstruct inspector_item :name :editor :updater)
+(defstruct inspector-item :name :editor :updater)
 
-(defn list_selection_update [selection_index indexed_str_options setter]
-  (let [item (first (filter (fn [[index str_opt opt]]
-			      (== index selection_index))
-			    indexed_str_options))]
+(defn list-selection-update [selection-index indexed-str-options setter]
+  (let [item (first (filter (fn [[index str-opt opt]]
+			      (== index selection-index))
+			    indexed-str-options))]
     (when item
-      (let [[index str_opt option] item]
+      (let [[index str-opt option] item]
 	(setter option)))))
 
-(defn create_list_inspector_item 
+(defn create-list-inspector-item 
   ([name options getter setter stringifier]
      (let [stringifier (if stringifier
 			 stringifier
 			 (memfn toString))
-	   indexed_str_options (map 
+	   indexed-str-options (map 
 				(fn [index option] 
 				  [index (stringifier option) option])
 				(iterate inc 0) options )
-	   str_values (map (fn [[_ str _]] str) indexed_str_options)
-	   str_array (into-array String str_values)
-	   editor (JComboBox. str_array)
-	   events_masked (ref false)
-	   selection_listener (proxy [Object ActionListener] []
-				(actionPerformed [_]
-						 (when (not @events_masked)
-						   (list_selection_update 
-						    (. editor getSelectedIndex) indexed_str_options setter))))
+	   str-values (map (fn [[- str -]] str) indexed-str-options)
+	   str-array (into-array String str-values)
+	   editor (JComboBox. str-array)
+	   events-masked (ref false)
+	   selection-listener (proxy [Object ActionListener] []
+				(actionPerformed [-]
+						 (when (not @events-masked)
+						   (list-selection-update 
+						    (. editor getSelectedIndex) indexed-str-options setter))))
 	   updater (fn []
 		     (let [current (getter)
 			   item (first (filter 
-					(fn [[index str_opt option]] (= option current))
-					indexed_str_options))]
+					(fn [[index str-opt option]] (= option current))
+					indexed-str-options))]
 		       (when item
-			 (let [[index str_opt option] item]
-			   (dosync (ref-set events_masked true))
+			 (let [[index str-opt option] item]
+			   (dosync (ref-set events-masked true))
 			   (. editor setSelectedIndex index)
-			   (dosync (ref-set events_masked false))
+			   (dosync (ref-set events-masked false))
 			   nil))))]
-       (. editor addActionListener selection_listener)
+       (. editor addActionListener selection-listener)
        (updater)
-       (struct-map inspector_item :name name :editor editor :updater updater)))
+       (struct-map inspector-item :name name :editor editor :updater updater)))
   ([name options getter setter]
-     (create_list_inspector_item name options getter setter nil)))
+     (create-list-inspector-item name options getter setter nil)))
 
-(defn count_zeros [str]
+(defn count-zeros [str]
 	(let [len (.length str)
 	      point (.indexOf str ".")
-	      chars_after (- len point 1)
-	      chars_before (- len chars_after 1)]
-	  (if (>= chars_before 0)
-	    [chars_before chars_after]
-	    [chars_after 0])))
+	      chars-after (- len point 1)
+	      chars-before (- len chars-after 1)]
+	  (if (>= chars-before 0)
+	    [chars-before chars-after]
+	    [chars-after 0])))
 
-(defn try_parse_float[str]
+(defn try-parse-float[str]
   (if str
     (try
      [true (Float/parseFloat str)]
@@ -76,83 +76,83 @@
        [false (float 0.0)]))
     [false 0.0]))
 
-(defn create_min_size_text_field[preferred_size_ref]
+(defn create-min-size-text-field[preferred-size-ref]
   (proxy [JTextField] []
     (getPreferredSize [] 
-		      (if @preferred_size_ref
-			@preferred_size_ref
+		      (if @preferred-size-ref
+			@preferred-size-ref
 			(proxy-super getPreferredSize)))))
 
-;format_str is in the form of:
+;format-str is in the form of:
 ;00.00 where the zeros indicate how many digits
 ;to account for
-(defn create_float_slider_inspector_item [name min_val max_val getter setter format_str]
+(defn create-float-slider-inspector-item [name min-val max-val getter setter format-str]
   (let [slider (JSlider. )
-	pref_sized_ref (ref nil)
-	input_box (create_min_size_text_field pref_sized_ref)
+	pref-sized-ref (ref nil)
+	input-box (create-min-size-text-field pref-sized-ref)
 	panel (JPanel.)
-	event_mask (ref false)
-	[zeros_before zeros_after] (count_zeros format_str)
-	zeros_before (max zeros_before 1) ;initial decimal in printf has to be 1 or more
-	printf_str (with-out-str (printf "%%%d.%df" zeros_before zeros_after))
-	min_val (min max_val min_val)
-	max_val (max max_val min_val)
-	range (- max_val min_val)
-	set_text_val (fn [val]
-		       (let [text_val (with-out-str (printf printf_str (float val)))]
-			 (. input_box setText text_val)))
-	set_slider_val (fn [val]
-			 (let [slider_val (* (/ (- val min_val) range) 100)]
-			   (. slider setValue slider_val)))
+	event-mask (ref false)
+	[zeros-before zeros-after] (count-zeros format-str)
+	zeros-before (max zeros-before 1) ;initial decimal in printf has to be 1 or more
+	printf-str (with-out-str (printf "%%%d.%df" zeros-before zeros-after))
+	min-val (min max-val min-val)
+	max-val (max max-val min-val)
+	range (- max-val min-val)
+	set-text-val (fn [val]
+		       (let [text-val (with-out-str (printf printf-str (float val)))]
+			 (. input-box setText text-val)))
+	set-slider-val (fn [val]
+			 (let [slider-val (* (/ (- val min-val) range) 100)]
+			   (. slider setValue slider-val)))
 	updater (fn []
-		  (let [cur_val (getter)]
-		    (dosync (ref-set event_mask true))
-		    (set_text_val cur_val)
-		    (set_slider_val cur_val)
-		    (dosync (ref-set event_mask false))))
-	slider_listener (proxy [Object ChangeListener] []
-			    (stateChanged [_]
-					  (when (not @event_mask)
-					    (let [int_val (. slider getValue)
-						  rel_val (+ (* range
-								(/ int_val 100))
-							     min_val)]
-					      (setter rel_val)
+		  (let [cur-val (getter)]
+		    (dosync (ref-set event-mask true))
+		    (set-text-val cur-val)
+		    (set-slider-val cur-val)
+		    (dosync (ref-set event-mask false))))
+	slider-listener (proxy [Object ChangeListener] []
+			    (stateChanged [-]
+					  (when (not @event-mask)
+					    (let [int-val (. slider getValue)
+						  rel-val (+ (* range
+								(/ int-val 100))
+							     min-val)]
+					      (setter rel-val)
 					      (updater)))))
-	text_listener (proxy [Object ActionListener] []
+	text-listener (proxy [Object ActionListener] []
 			(actionPerformed [event]
-					 (when (not @event_mask)
-					   (let [[parsed fval] (try_parse_float (. input_box getText))]
+					 (when (not @event-mask)
+					   (let [[parsed fval] (try-parse-float (. input-box getText))]
 					     (when parsed
 					       (setter fval)
 					      (updater))))))
 	layout (GridBagLayout. )
 	constraints (GridBagConstraints.)]
-    (. input_box setText format_str)
-    (. input_box setHorizontalAlignment JTextField/RIGHT)
-    (dosync (ref-set pref_sized_ref (. input_box getPreferredSize)))
-    (. input_box setMinimumSize (. input_box getPreferredSize))
-    (. input_box addActionListener text_listener)
-    (. slider addChangeListener slider_listener)
+    (. input-box setText format-str)
+    (. input-box setHorizontalAlignment JTextField/RIGHT)
+    (dosync (ref-set pref-sized-ref (. input-box getPreferredSize)))
+    (. input-box setMinimumSize (. input-box getPreferredSize))
+    (. input-box addActionListener text-listener)
+    (. slider addChangeListener slider-listener)
     (. panel setLayout layout)
-    (add_with_constraints slider constraints panel
+    (add-with-constraints slider constraints panel
 			  gridx 0
 			  gridy 0
 			  anchor GridBagConstraints/WEST
 			  fill GridBagConstraints/HORIZONTAL
 			  weightx 1.0)
-    (add_with_constraints input_box constraints panel
+    (add-with-constraints input-box constraints panel
 			  gridx 1
 			  gridy 0
 			  anchor GridBagConstraints/EAST
 			  fill GridBagConstraints/NONE
 			  weightx 0.0)
     (updater)
-    (struct-map inspector_item :name name :editor panel :updater updater)
+    (struct-map inspector-item :name name :editor panel :updater updater)
     ))
 
 ;onclick takes no arguments.
-(defn create_read_only_hyperlink_inspector_item [name getter onclick]
+(defn create-read-only-hyperlink-inspector-item [name getter onclick]
   (let [retval (JTextPane. )
 	value (getter)
 	updater (fn []
@@ -169,24 +169,24 @@
       (.setEditable false)
       (.addHyperlinkListener listener))
     (updater)
-    (struct-map inspector_item :name name :editor retval :updater updater)))
+    (struct-map inspector-item :name name :editor retval :updater updater)))
       
 
-(defn setup_inspector_panel [inPanel inspector_item_seq]
+(defn setup-inspector-panel [inPanel inspector-item-seq]
   (. inPanel removeAll)
   (let [layout (GridBagLayout. )
 	constraints (GridBagConstraints. )]
     (. inPanel setLayout (GridBagLayout.))
     (sets! constraints ipadx 1 ipady 1)
-    (doseq [[index item] (map vector (iterate inc 0) inspector_item_seq)]
-      (add_with_constraints (JLabel. (item :name)) constraints inPanel
+    (doseq [[index item] (map vector (iterate inc 0) inspector-item-seq)]
+      (add-with-constraints (JLabel. (item :name)) constraints inPanel
 			  gridx 0
 			  gridy index
 			  ipadx 0
 			  anchor GridBagConstraints/EAST
 			  fill GridBagConstraints/NONE
 			  weightx 0.0)
-      (add_with_constraints (item :editor) constraints inPanel
+      (add-with-constraints (item :editor) constraints inPanel
 			  gridx 1
 			  gridy index
 			  ipadx 0

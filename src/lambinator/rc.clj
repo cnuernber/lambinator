@@ -36,13 +36,13 @@
 ;surface is a 2D slice that we can render to and bind as a texture
 ;Colors- floating point, 0.0-1.0 (greater than 1.0 is allowed for some
 ;operations)
-(def rc_formats [:rgba :rgb :alpha :lum :lum_alpha])
-(def rc_datatypes [:ubyte :ushort :float :half_float] ) ;values used for
-(defstruct texture_spec :datatype :format :size)
-(defstruct mipmapped_texture_spec :texture :mipmap_count)
+(def rc-formats [:rgba :rgb :alpha :lum :lum-alpha])
+(def rc-datatypes [:ubyte :ushort :float :half-float] ) ;values used for
+(defstruct texture-spec :datatype :format :size)
+(defstruct mipmapped-texture-spec :texture :mipmap-count)
 ;cube maps can have mipmapped textures specified as their
 ;textures.  I have never really tried this.
-(defstruct cubemap_spec :top :bottom :left :right :front :back)
+(defstruct cubemap-spec :top :bottom :left :right :front :back)
 (defstruct color :r :g :b :a)
 
 
@@ -53,24 +53,24 @@
 ;furthermore, when a scene is finished all relative surfaces
 ;still held, if any other than relative surface 0,
 ;should be released.
-(def render_command_types 
-     [:scene_render_command
-      :allocate_surface_render_command 
-      :release_surface_render_command])
-(defstruct scene_render_command :render_command_type :surface_spec :clear_color )
+(def render-command-types 
+     [:scene-render-command
+      :allocate-surface-render-command 
+      :release-surface-render-command])
+(defstruct scene-render-command :render-command-type :surface-spec :clear-color )
 
-(defn create_texture_spec [format type width height]
-  (struct texture_spec type format [width height]))
+(defn create-texture-spec [format type width height]
+  (struct texture-spec type format [width height]))
 
-(defn create_mipmapped_texture_spec [texture count]
-     (struct mipmapped_texture_spec texture count))
+(defn create-mipmapped-texture-spec [texture count]
+     (struct mipmapped-texture-spec texture count))
 
-(defn create_color [r g b a]
+(defn create-color [r g b a]
   (struct color r g b a))
 
 
 ;do details; type and format match
-(defn texture_details_match [texture1 texture2]
+(defn texture-details-match [texture1 texture2]
   (and (= (texture1 :datatype)
 	   (texture2 :datatype))
        (= (texture1 :format)
@@ -78,16 +78,16 @@
 
 ;ignoring width and height, could you substitute
 ;surface1 for surface2
-(defn surface_details_match [surface1 surface2]
+(defn surface-details-match [surface1 surface2]
   (and (= (surface1 :attachments)
 	  (surface2 :attachments))
-       (= (surface1 :multi_sample)
-	  (surface2 :multi_sample))))
+       (= (surface1 :multi-sample)
+	  (surface2 :multi-sample))))
 
 ;how many bytes would you have to allocate to
 ;fit desired in surface
 ;Assume you aren't going to shrink a surface
-(defn bytes_required [surface desired]
+(defn bytes-required [surface desired]
   (let [[sw sh] ( surface :size)
 	[dw dh] (desired :size)
 	max (fn [s d] (if (> d s) d s))]
@@ -102,36 +102,36 @@
     (- (* sw sh) (* dw dh))))
 
 
-(def renderbuffer_types [:color :depth])
-(defstruct renderbuffer_data 
+(def renderbuffer-types [:color :depth])
+(defstruct renderbuffer-data 
   :type ;the type, one of the above render buffer types
-  :depth_bits ;number of bits; used only for depth buffers
-  :color_datatype ;the color datatype, ubyte ushort half_float float
-  :color_format ;format rbga rbg lum lum_alpha
-  :use_texture) ;true if you want this renderbuffer to render to a texture.
-(defmulti create_renderbuffer (fn [type & args] type))
+  :depth-bits ;number of bits; used only for depth buffers
+  :color-datatype ;the color datatype, ubyte ushort half-float float
+  :color-format ;format rbga rbg lum lum-alpha
+  :use-texture) ;true if you want this renderbuffer to render to a texture.
+(defmulti create-renderbuffer (fn [type & args] type))
 
-(def surface_depth_bits [:16 :24 :32] ) ;values used for depth_bits
+(def surface-depth-bits [:16 :24 :32] ) ;values used for depth-bits
 
 ;create a depth renderbuffer specifying the bits from the above array
 ;and whether to use a texture
-(defmethod create_renderbuffer :depth [type depth_bits use_texture] 
-  (throw_if_item_missing depth_bits surface_depth_bits "depth_bits must be a surface_depth_bits: " depth_bits)
-  (struct-map renderbuffer_data :type type :depth_bits depth_bits :use_texture use_texture))
+(defmethod create-renderbuffer :depth [type depth-bits use-texture] 
+  (throw-if-item-missing depth-bits surface-depth-bits "depth-bits must be a surface-depth-bits: " depth-bits)
+  (struct-map renderbuffer-data :type type :depth-bits depth-bits :use-texture use-texture))
 
 ;Create a color renderbuffer 
-(defmethod create_renderbuffer :color [type datatype format use_texture]
-  (throw_if_item_missing datatype rc_datatypes "datatype must be an rc datatype: " datatype)
-  (throw_if_item_missing format rc_formats "format must be an rc format: " format)
-  (struct-map renderbuffer_data 
+(defmethod create-renderbuffer :color [type datatype format use-texture]
+  (throw-if-item-missing datatype rc-datatypes "datatype must be an rc datatype: " datatype)
+  (throw-if-item-missing format rc-formats "format must be an rc format: " format)
+  (struct-map renderbuffer-data 
     :type type ;color
-    :color_datatype datatype ;datatype of the color buffer
-    :color_format format     ;format of the color buffer
-    :use_texture use_texture)) ;true if you want a texture from this buffer.
+    :color-datatype datatype ;datatype of the color buffer
+    :color-format format     ;format of the color buffer
+    :use-texture use-texture)) ;true if you want a texture from this buffer.
 
 
-(def surface_attachment_points [:color0 :color1 :color2 :color3 :depthl])
-(def multisample_num_samples [:2 :4 :8 :16])
+(def surface-attachment-points [:color0 :color1 :color2 :color3 :depthl])
+(def multisample-num-samples [:2 :4 :8 :16])
 ;a surface can have several attachments.  It *has* to have color0, but other than that
 ;it is up to you; if you want to have multiple render target support then you need to create
 ;FBOs that support this by filling in color0-colorn for each render target you want.
@@ -139,27 +139,27 @@
 ;texture attachments.  Thus a multi sample fbo setup is pretty particular and I considered
 ;making it a special surface type, but I figure it is better to just let users sort
 ;it all out ;).
-(defstruct surface_spec :attachments :size :multi_sample)
-(defn create_surface_spec 
-  ([attachments width height multi_sample] 
-     (when multi_sample
-       (throw_if_item_missing multi_sample 
-			      multisample_num_samples 
-			      "datatype must be multisample_num_samples: " multi_sample))
-     (struct-map surface_spec 
+(defstruct surface-spec :attachments :size :multi-sample)
+(defn create-surface-spec 
+  ([attachments width height multi-sample] 
+     (when multi-sample
+       (throw-if-item-missing multi-sample 
+			      multisample-num-samples 
+			      "datatype must be multisample-num-samples: " multi-sample))
+     (struct-map surface-spec 
        :attachments attachments
        :size [width height]
-       :multi_sample multi_sample))
-  ([attachments width height] (create_surface_spec attachments width height nil)))
+       :multi-sample multi-sample))
+  ([attachments width height] (create-surface-spec attachments width height nil)))
 
 ;There are certain combinations that don't make any sense.
 ;like attaching a depth renderbuffer to a color attachment point.
 ;or attaching a multisample buffer to the depth attachment point.
 ;so just don't do it.
 ;returns a new sspec
-(defn attach_renderbuffer [sspec attach_pt buffer]
+(defn attach-renderbuffer [sspec attach-pt buffer]
   (assoc sspec :attachments 
-	 (assoc (sspec :attachments) attach_pt buffer)))
+	 (assoc (sspec :attachments) attach-pt buffer)))
 
-(defn has_multi_sample[sspec]
-  (not (nil? (sspec :multi_sample))))
+(defn has-multi-sample[sspec]
+  (not (nil? (sspec :multi-sample))))

@@ -33,7 +33,6 @@
 	<path location="${table_layout_jar}"/>
       </classpath>
       <sysproperty key="clojure.compile.path" value="${build}"/>
-      <arg value="lambinator.experiment"/>
       <arg value="lambinator.ui"/>
       <arg value="lambinator.rc"/>
       <arg value="lambinator.rcgl"/>

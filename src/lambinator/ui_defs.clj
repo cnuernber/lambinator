@@ -5,94 +5,94 @@
 ;else you loose the definition of the system vars
 ;and various other static info.
 
-(defonce gl_system_lookup_strs
+(defonce gl-system-lookup-strs
   '("GL_EXTENSIONS" 
     "GL_VENDOR"
     "GL_RENDERER"
     "GL_VERSION"))
 
-(defn get_supported_gl_extensions [gl_system_strs_ref]
-  (re-seq (Pattern/compile "\\S+") (@gl_system_strs_ref "GL_EXTENSIONS")))
+(defn get-supported-gl-extensions [gl-system-strs-ref]
+  (re-seq (Pattern/compile "\\S+") (@gl-system-strs-ref "GL_EXTENSIONS")))
 
-(defn get_sorted_htmlized_gl_extensions [gl_system_strs_ref]
+(defn get-sorted-htmlized-gl-extensions [gl-system-strs-ref]
   (let [bldr (StringBuilder.)]
     (. bldr append "<html>")
     (reduce 
      (fn [bldr str] (when (> (. bldr length) 6) (. bldr append "<BR>")) (. bldr append str) bldr) 
      bldr 
-     (sort (get_supported_gl_extensions gl_system_strs_ref)))
+     (sort (get-supported-gl-extensions gl-system-strs-ref)))
     (. bldr append "</html>")
     (. bldr toString )))
 
-(defn update_gl_system_strs [drawable gl_system_strs_ref] 
-  (let [sys_strs @gl_system_strs_ref
-	keys gl_system_lookup_strs
+(defn update-gl-system-strs [drawable gl-system-strs-ref] 
+  (let [sys-strs @gl-system-strs-ref
+	keys gl-system-lookup-strs
 	gl (. drawable getGL)]
     (let [newStrs (reduce 
 		   #(assoc %1 %2 
 			   (. gl glGetString 
-			      (get_static_field_value "javax.media.opengl.GL" %2))) 
-		   sys_strs keys)]
-      (dosync (ref-set gl_system_strs_ref newStrs)))))
+			      (get-static-field-value "javax.media.opengl.GL" %2))) 
+		   sys-strs keys)]
+      (dosync (ref-set gl-system-strs-ref newStrs)))))
 
-(defn add_gl_todo_item [gl_todo_list_ref item]
-  (dosync (ref-set gl_todo_list_ref (conj @gl_todo_list_ref item))))
+(defn add-gl-todo-item [gl-todo-list-ref item]
+  (dosync (ref-set gl-todo-list-ref (conj @gl-todo-list-ref item))))
 
-(defn gl_init [drawable gl_system_strs_ref render_context_ref]
+(defn gl-init [drawable gl-system-strs-ref render-context-ref]
   (try
-   (update_gl_system_strs drawable gl_system_strs_ref)
-   (let [new_context (rcgl_resources_destroyed drawable @render_context_ref)]
-     (dosync (ref-set render_context_ref (merge @render_context_ref new_context))))
+   (update-gl-system-strs drawable gl-system-strs-ref)
+   (let [new-context (rcgl-resources-destroyed drawable @render-context-ref)]
+     (dosync (ref-set render-context-ref (merge @render-context-ref new-context))))
    (catch Exception e
-     (println "Error duing gl_init: " (. e printStackTrace)))))
+     (println "Error duing gl-init: " (. e printStackTrace)))))
 
 ;Important that this gets wrapped in a try/catch
 ;if it doesn't, then you loose your ability to run the
 ;display method!
-(defn run_gl_todo_item[drawable item render_exceptions_ref]
+(defn run-gl-todo-item[drawable item render-exceptions-ref]
   (try
    (item drawable)
    (catch Exception e
      (. e printStackTrace))))
 
-(defn gl_display [drawable gl_todo_list_ref render_exceptions_ref gl_render_fn_ref]
-  (let [todoItems (reverse @gl_todo_list_ref)
-	render_fn @gl_render_fn_ref]
-    (dosync (ref-set gl_todo_list_ref nil))
+(defn gl-display [drawable gl-todo-list-ref render-exceptions-ref gl-render-fn-ref]
+  (let [todoItems (reverse @gl-todo-list-ref)
+	render-fn @gl-render-fn-ref]
+    (dosync (ref-set gl-todo-list-ref nil))
     (doseq [item todoItems]
-      (run_gl_todo_item drawable item render_exceptions_ref))
-    (if render_fn
-      (run_gl_todo_item drawable render_fn render_exceptions_ref)
+      (run-gl-todo-item drawable item render-exceptions-ref))
+    (if render-fn
+      (run-gl-todo-item drawable render-fn render-exceptions-ref)
       (let [gl (. drawable getGL)]
 	(. gl glClearColor 0.05 0.05 0.1 1.0)
 	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))))
 
-(defn gl_display_changed [drawable modelChanged devChanged])
+(defn gl-display-changed [drawable modelChanged devChanged])
 
-(defn gl_reshape [drawable x y width height gl_dimensions_ref]
-  (dosync (ref-set gl_dimensions_ref [x y width height])))
+(defn gl-reshape [drawable x y width height gl-dimensions-ref]
+  (dosync (ref-set gl-dimensions-ref [x y width height])))
 
-(defn create_gl_event_listener 
-  [render_exceptions_ref 
-   gl_dimensions_ref 
-   gl_system_strs_ref 
-   gl_todo_items_ref
-   render_context_ref
-   gl_render_fn_ref]
+(defn create-gl-event-listener 
+  [render-exceptions-ref 
+   gl-dimensions-ref 
+   gl-system-strs-ref 
+   gl-todo-items-ref
+   render-context-ref
+   gl-render-fn-ref]
   (proxy [Object GLEventListener]
 	  []
-	(init [dble] (gl_init dble gl_system_strs_ref render_context_ref))
+	(init [dble] (gl-init dble gl-system-strs-ref render-context-ref))
 
-	(display [dble] (gl_display dble gl_todo_items_ref render_exceptions_ref gl_render_fn_ref))
+	(display [dble] (gl-display dble gl-todo-items-ref render-exceptions-ref gl-render-fn-ref))
 
 	(displayChanged [dble modeChanged devChanged]
-			(gl_display_changed dble modeChanged devChanged ))
+			(gl-display-changed dble modeChanged devChanged ))
 
-	(reshape [dble x y width height] (gl_reshape dble x y width height gl_dimensions_ref))))
+	(reshape [dble x y width height] (gl-reshape dble x y width height gl-dimensions-ref))))
 
 ;jlabels aren't selectable and copyable, which drives me fucking
 ;crazy.  Why can't you select and copy any text in a UI?
-(defn create_label [text]
+(defn create-label [text]
   (let [field (JTextPane.)]
     (try 
      (. field setEditorKit (HTMLEditorKit. ))
@@ -104,59 +104,59 @@
       (.setEditable false))
     field))
 
-(defn create_scrollable_extensions_label [gl_system_strs_ref]
-  (let [text (get_sorted_htmlized_gl_extensions gl_system_strs_ref)
-	lbl (create_label text)
+(defn create-scrollable-extensions-label [gl-system-strs-ref]
+  (let [text (get-sorted-htmlized-gl-extensions gl-system-strs-ref)
+	lbl (create-label text)
 	pane (JScrollPane. lbl 
 			   ScrollPaneConstants/VERTICAL_SCROLLBAR_AS_NEEDED
 			   ScrollPaneConstants/HORIZONTAL_SCROLLBAR_NEVER)]
     pane))
 
-(defn get_gl_system_property [name gl_system_strs_ref]
-  (@gl_system_strs_ref name))
+(defn get-gl-system-property [name gl-system-strs-ref]
+  (@gl-system-strs-ref name))
 
-(defn display_opengl_properties [frame gl_system_strs_ref]
+(defn display-opengl-properties [frame gl-system-strs-ref]
   ;open up something to display the system properties
   (let [dlg (JDialog. frame "Open GL Information")
 	constraints (GridBagConstraints.) ]
     (. dlg setLayout (GridBagLayout.))
     (sets! constraints ipadx 1 ipady 1)
-    (add_with_constraints (create_label "Version") constraints dlg
+    (add-with-constraints (create-label "Version") constraints dlg
 			  gridx 0
 			  gridy 0
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_label (get_gl_system_property "GL_VERSION" gl_system_strs_ref)) constraints dlg
+    (add-with-constraints (create-label (get-gl-system-property "GL_VERSION" gl-system-strs-ref)) constraints dlg
 			  gridx 1
 			  gridy 0
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add_with_constraints (create_label "Vendor") constraints dlg
+    (add-with-constraints (create-label "Vendor") constraints dlg
 			  gridx 0
 			  gridy 1
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_label (get_gl_system_property "GL_VENDOR" gl_system_strs_ref)) constraints dlg
+    (add-with-constraints (create-label (get-gl-system-property "GL_VENDOR" gl-system-strs-ref)) constraints dlg
 			  gridx 1
 			  gridy 1
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add_with_constraints (create_label "Renderer") constraints dlg
+    (add-with-constraints (create-label "Renderer") constraints dlg
 			  gridx 0
 			  gridy 2
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_label (get_gl_system_property "GL_RENDERER" gl_system_strs_ref)) constraints dlg
+    (add-with-constraints (create-label (get-gl-system-property "GL_RENDERER" gl-system-strs-ref)) constraints dlg
 			  gridx 1
 			  gridy 2
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/HORIZONTAL)
-    (add_with_constraints (create_label "Extensions" ) constraints dlg
+    (add-with-constraints (create-label "Extensions" ) constraints dlg
 			  gridx 0
 			  gridy 3
 			  anchor GridBagConstraints/NORTHWEST
 			  fill GridBagConstraints/NONE)
-    (add_with_constraints (create_scrollable_extensions_label gl_system_strs_ref) constraints dlg
+    (add-with-constraints (create-scrollable-extensions-label gl-system-strs-ref) constraints dlg
 			  gridx 1
 			  gridy 3
 			  weightx 1.0
@@ -168,15 +168,15 @@
       (.setSize (.. dlg getPreferredSize width) 300)
       (.show))))
   
-(defn create_action_listener [lmbda]
+(defn create-action-listener [lmbda]
   (proxy [Object ActionListener]
       []
     (actionPerformed 
      [evt]
      (apply lmbda [evt]))))
 
-(defn create_menu_item [title lmbda parent]
+(defn create-menu-item [title lmbda parent]
   (let [item (JMenuItem. title)]
-    (. item addActionListener (create_action_listener lmbda))
+    (. item addActionListener (create-action-listener lmbda))
     (. parent add item)
     item))

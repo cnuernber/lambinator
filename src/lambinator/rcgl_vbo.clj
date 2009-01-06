@@ -1,112 +1,112 @@
 (in-ns 'lambinator.rcgl)
 
-(defn rcgl_vbo_log [log_data_ref type & args]
-  (when log_data_ref
-    (log_message @log_data_ref "rcgl.glsl:" type args)))
+(defn rcgl-vbo-log [log-data-ref type & args]
+  (when log-data-ref
+    (log-message @log-data-ref "rcgl.glsl:" type args)))
 
 ;gl supports two array types, ones for data and ones for index.
-(def vbo_types [:data :index])
-(def vbo_datatypes [:ubyte :ushort :float])
-(defstruct gl_vbo :gl_handle :name :type :generator :gl_datatype :item_count :gl_error)
+(def vbo-types [:data :index])
+(def vbo-datatypes [:ubyte :ushort :float])
+(defstruct gl-vbo :gl-handle :name :type :generator :gl-datatype :item-count :gl-error)
 
-(defn gl_vbo_valid[vbo]
+(defn gl-vbo-valid[vbo]
   (and vbo
-   (> (vbo :gl_handle) 0)))
+   (> (vbo :gl-handle) 0)))
 
-(defmulti vbo_gl_type_from_vbo_type identity)
-(defmethod vbo_gl_type_from_vbo_type :default [_] GL/GL_ARRAY_BUFFER)
-(defmethod vbo_gl_type_from_vbo_type :index [_] GL/GL_ELEMENT_ARRAY_BUFFER)
+(defmulti vbo-gl-type-from-vbo-type identity)
+(defmethod vbo-gl-type-from-vbo-type :default [-] GL/GL_ARRAY_BUFFER)
+(defmethod vbo-gl-type-from-vbo-type :index [-] GL/GL_ELEMENT_ARRAY_BUFFER)
 
-(defn create_invalid_vbo[name vbo_type]
-  (struct gl_vbo 0 name vbo_type nil))
+(defn create-invalid-vbo[name vbo-type]
+  (struct gl-vbo 0 name vbo-type nil))
 
-(defmulti gl_datatype_from_clojure_type #(class %))
-(defmethod gl_datatype_from_clojure_type :default [_] GL/GL_FLOAT)
-(defmethod gl_datatype_from_clojure_type Short/TYPE [_] GL/GL_SHORT)
-(defmethod gl_datatype_from_clojure_type Byte/TYPE [_] GL/GL_BYTE)
-(defmethod gl_datatype_from_clojure_type Integer/TYPE [_] GL/GL_INT)
+(defmulti gl-datatype-from-clojure-type #(class %))
+(defmethod gl-datatype-from-clojure-type :default [-] GL/GL_FLOAT)
+(defmethod gl-datatype-from-clojure-type Short/TYPE [-] GL/GL_SHORT)
+(defmethod gl-datatype-from-clojure-type Byte/TYPE [-] GL/GL_BYTE)
+(defmethod gl-datatype-from-clojure-type Integer/TYPE [-] GL/GL_INT)
 
-(defmulti item_size_from_clojure_type #(class %))
-(defmethod item_size_from_clojure_type :default [_] 4)
-(defmethod item_size_from_clojure_type Short/TYPE [_] 2)
-(defmethod item_size_from_clojure_type Byte/TYPE [_] 1)
+(defmulti item-size-from-clojure-type #(class %))
+(defmethod item-size-from-clojure-type :default [-] 4)
+(defmethod item-size-from-clojure-type Short/TYPE [-] 2)
+(defmethod item-size-from-clojure-type Byte/TYPE [-] 1)
 
 ;datatype is one of the rc datatypes, ubyte ushort or float 
-(defn create_gl_vbo [log_data_ref gl name vbo_type data_seq generator]
-  (let [data_buffer (make_nio_buffer data_seq)
-	new_vbo (struct gl_vbo 0 name vbo_type generator)]
-    (if data_buffer
+(defn create-gl-vbo [log-data-ref gl name vbo-type data-seq generator]
+  (let [data-buffer (make-nio-buffer data-seq)
+	new-vbo (struct gl-vbo 0 name vbo-type generator)]
+    (if data-buffer
       (do
-	(rcgl_fbo_log log_data_ref :info "Creating vbo: " name)
+	(rcgl-fbo-log log-data-ref :info "Creating vbo: " name)
 	
-	(let [vbo_handle (allocate_gl_item (fn [count args offset] (. gl glGenBuffers count args offset)))
-	      vbo_gl_type (vbo_gl_type_from_vbo_type vbo_type)
-	      gl_datatype (gl_datatype_from_clojure_type (first data_seq))
-	      item_count (. data_buffer limit)
-	      data_size (* item_count (item_size_from_clojure_type (first data_seq)))]
-	  (. gl glBindBuffer vbo_gl_type vbo_handle)
-	  (. gl glBufferData vbo_gl_type data_size data_buffer GL/GL_STATIC_DRAW )
-	  (assoc new_vbo 
-	    :gl_handle vbo_handle 
-	    :gl_datatype gl_datatype 
-	    :item_count item_count 
-	    :gl_error (get_gl_error gl))))
-      new_vbo)))
+	(let [vbo-handle (allocate-gl-item (fn [count args offset] (. gl glGenBuffers count args offset)))
+	      vbo-gl-type (vbo-gl-type-from-vbo-type vbo-type)
+	      gl-datatype (gl-datatype-from-clojure-type (first data-seq))
+	      item-count (. data-buffer limit)
+	      data-size (* item-count (item-size-from-clojure-type (first data-seq)))]
+	  (. gl glBindBuffer vbo-gl-type vbo-handle)
+	  (. gl glBufferData vbo-gl-type data-size data-buffer GL/GL_STATIC_DRAW )
+	  (assoc new-vbo 
+	    :gl-handle vbo-handle 
+	    :gl-datatype gl-datatype 
+	    :item-count item-count 
+	    :gl-error (get-gl-error gl))))
+      new-vbo)))
 
-(defn delete_gl_vbo[log_data_ref gl vbo]
-  (when (gl_vbo_valid vbo)
-    (rcgl_fbo_log log_data_ref :info "deleting vbo: " (vbo :name))
-    (release_gl_item (fn [count args offset] (. gl glDeleteBuffers count args offset)) (vbo :gl_handle)))
-  (assoc vbo :gl_handle 0))
+(defn delete-gl-vbo[log-data-ref gl vbo]
+  (when (gl-vbo-valid vbo)
+    (rcgl-fbo-log log-data-ref :info "deleting vbo: " (vbo :name))
+    (release-gl-item (fn [count args offset] (. gl glDeleteBuffers count args offset)) (vbo :gl-handle)))
+  (assoc vbo :gl-handle 0))
 
-(defn add_new_vbo [gl vbos_ref name vbo_type ]
+(defn add-new-vbo [gl vbos-ref name vbo-type ]
   (dosync
-   (let [existing (@vbos_ref name)]
-     (ref-set vbos_ref (assoc @vbos_ref name (create_invalid_vbo name vbo_type)))
+   (let [existing (@vbos-ref name)]
+     (ref-set vbos-ref (assoc @vbos-ref name (create-invalid-vbo name vbo-type)))
      existing)))	 
 
-(defn get_and_remove_vbo [vbos_ref name]
+(defn get-and-remove-vbo [vbos-ref name]
   (dosync
-   (let [existing (@vbos_ref name)]
-     (ref-set vbos_ref (dissoc @vbos_ref name))
+   (let [existing (@vbos-ref name)]
+     (ref-set vbos-ref (dissoc @vbos-ref name))
      existing)))
 
-(defn update_vbo[log_data_ref gl vbos_ref name generator]
-  (let [existing (@vbos_ref name)]
+(defn update-vbo[log-data-ref gl vbos-ref name generator]
+  (let [existing (@vbos-ref name)]
     (when existing
-      (let [vbo_type (existing :type)
-	    generate_seq (generator)
-	    new_vbo (create_gl_vbo log_data_ref gl name vbo_type generate_seq generator)]
-	(dosync (ref-set vbos_ref (assoc @vbos_ref name new_vbo)))
-	(delete_gl_vbo log_data_ref gl existing)))))
+      (let [vbo-type (existing :type)
+	    generate-seq (generator)
+	    new-vbo (create-gl-vbo log-data-ref gl name vbo-type generate-seq generator)]
+	(dosync (ref-set vbos-ref (assoc @vbos-ref name new-vbo)))
+	(delete-gl-vbo log-data-ref gl existing)))))
 
-(defn create_vbo [log_data_ref gl vbos_ref name vbo_type generator]
-  (let [existing (add_new_vbo gl vbos_ref name vbo_type)
-	matches_exactly (and existing
-			     (= (existing :vbo_type) vbo_type))]
-    (when (not matches_exactly)
+(defn create-vbo [log-data-ref gl vbos-ref name vbo-type generator]
+  (let [existing (add-new-vbo gl vbos-ref name vbo-type)
+	matches-exactly (and existing
+			     (= (existing :vbo-type) vbo-type))]
+    (when (not matches-exactly)
       (when existing
-	(delete_gl_vbo log_data_ref gl existing))
-      (update_vbo log_data_ref gl vbos_ref name generator))))
+	(delete-gl-vbo log-data-ref gl existing))
+      (update-vbo log-data-ref gl vbos-ref name generator))))
 
-(defn delete_vbo [log_data_ref gl vbos_ref name]
-  (let [existing (get_and_remove_vbo vbos_ref name)]
+(defn delete-vbo [log-data-ref gl vbos-ref name]
+  (let [existing (get-and-remove-vbo vbos-ref name)]
     (when existing
-      (delete_gl_vbo log_data_ref gl existing))))
+      (delete-gl-vbo log-data-ref gl existing))))
 
 ;called when all of the system resources need to be rebooted.
-(defn vbo_resources_destroyed[log_data_ref gl vbos_ref]
-  (let [new_vbos (mapcat (fn [[name vbo]]
+(defn vbo-resources-destroyed[log-data-ref gl vbos-ref]
+  (let [new-vbos (mapcat (fn [[name vbo]]
 			   (let [generator (vbo :generator)
-				 data_seq (generator)
-				 vbo_type (vbo :vbo_type)
-				 new_vbo (create_gl_vbo log_data_ref gl (vbo :name) vbo_type data_seq generator)]
-			     [name new_vbo]))
-			 @vbos_ref)]
-    (when new_vbos
-      (dosync (ref-set vbos_ref (apply assoc @vbos_ref new_vbos))))))
+				 data-seq (generator)
+				 vbo-type (vbo :vbo-type)
+				 new-vbo (create-gl-vbo log-data-ref gl (vbo :name) vbo-type data-seq generator)]
+			     [name new-vbo]))
+			 @vbos-ref)]
+    (when new-vbos
+      (dosync (ref-set vbos-ref (apply assoc @vbos-ref new-vbos))))))
 
 
-(defstruct vbo_manager :vbos_ref) ;vbos mapped to names
-(defn create_vbo_manager [] (struct vbo_manager (ref {})))
+(defstruct vbo-manager :vbos-ref) ;vbos mapped to names
+(defn create-vbo-manager [] (struct vbo-manager (ref {})))
 				 
