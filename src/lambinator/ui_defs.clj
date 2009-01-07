@@ -9,6 +9,7 @@
   '("GL_EXTENSIONS" 
     "GL_VENDOR"
     "GL_RENDERER"
+    "GL_SHADING_LANGUAGE_VERSION"
     "GL_VERSION"))
 
 (defn get-supported-gl-extensions [gl-system-strs-ref]

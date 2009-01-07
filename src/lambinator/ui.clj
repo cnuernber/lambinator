@@ -2,10 +2,10 @@
   (:import (javax.media.opengl GLJPanel GLEventListener GL GLCapabilities)
 	   (javax.swing JFrame JMenu JMenuBar JMenuItem UIManager JDialog JLabel
 			JScrollPane ScrollPaneConstants JTextField JTextPane
-			SwingUtilities JButton JPanel)
+			SwingUtilities JButton JPanel BoxLayout)
 	   (javax.swing.text.html HTMLEditorKit)
 	   (com.sun.opengl.util FPSAnimator)
-	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension)
+	   (java.awt BorderLayout GridBagLayout GridBagConstraints Dimension Component)
 	   (java.awt.event ActionListener WindowListener ComponentListener)
 	   (java.util.regex Pattern)
 	   (java.util.concurrent CountDownLatch)
@@ -73,10 +73,10 @@
 	log-pane (create-label "")
 	newTool (JScrollPane. log-pane)
 	inspector-panel (JPanel.)
+	inspector-wrapper-panel (JPanel. )
 	inspector-scroll (JScrollPane. inspector-panel
 				       ScrollPaneConstants/VERTICAL_SCROLLBAR_AS_NEEDED
 				       ScrollPaneConstants/HORIZONTAL_SCROLLBAR_NEVER)]
-    
     (. window-mgr registerToolWindow "Log" "Application Log" nil newTool ToolWindowAnchor/BOTTOM)
     (. window-mgr registerToolWindow "Inspector" "Inspector Palette" nil inspector-scroll ToolWindowAnchor/RIGHT)
     (doseq [window (. window-mgr getToolWindows)]

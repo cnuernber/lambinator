@@ -419,7 +419,7 @@
   (let [demo-data @wave-demo-data-ref
 	frame (demo-data :frame)
 	items (demo-data :inspector-items)]
-    (setup-inspector-panel (frame :inspector-pane) (demo-data :inspector-items))))
+    (uii-setup-inspector-panel (frame :inspector-pane) (demo-data :inspector-items))))
 
 (defn get-first-non-null[items]
   (first (filter #(not(nil? %)) items)))
@@ -476,7 +476,7 @@
 			    :num-samples :4
 			    :geom-type :vbo)))
   (let [frame (ui-create-app-frame "Wave Demo")
-	aa-item (create-list-inspector-item 
+	aa-item (uii-create-list-inspector-item 
 		 "Antialiasing: " ;item name
 		 aa-choices-array ;choices
 		 (fn [] (@retval :num-samples)) ;getter
@@ -487,7 +487,7 @@
 		   (if (= item :none)
 		     "none"
 		     (util-stringify (name item) "x"))))
-	geom-item (create-list-inspector-item
+	geom-item (uii-create-list-inspector-item
 		   "Geom Render Mode: " ;name
 		   geom-choices-array   ;options 
 		   (fn [] (@retval :geom-type)) ;getter
@@ -498,32 +498,32 @@
 		       "immediate"
 		       "vertex buffer object"
 		       )))
-	freq-item (create-float-slider-inspector-item
+	freq-item (uii-create-float-slider-inspector-item
 		   "Wave Frequency: "
 		   0
 		   30
 		   (fn [] (@retval :wave-freq))
 		   (fn [val] (dosync (ref-set retval (assoc @retval :wave-freq val))))
 		   "00.0")
-	width-item (create-float-slider-inspector-item
+	width-item (uii-create-float-slider-inspector-item
 		    "Wave Width: "
 		    0
 		    1
 		   (fn [] (@retval :wave-width))
 		   (fn [val] (dosync (ref-set retval (assoc @retval :wave-width val))))
 		   "0.00")
-	height-item (create-float-slider-inspector-item
+	height-item (uii-create-float-slider-inspector-item
 		     "Wave Height: "
 		     0
 		     100
 		     (fn [] (@retval :wave-height))
 		     (fn [val] (dosync (ref-set retval (assoc @retval :wave-height val))))
 		     "000.0")
-	glslv-item (create-read-only-hyperlink-inspector-item 
+	glslv-item (uii-create-read-only-hyperlink-inspector-item 
 		    "Vertex Shader: "
 		    (fn [] "/data/glsl/wave.glslv")
 		    #(handle-wave-glsl-edit retval :glslv-edited "/data/glsl/wave.glslv"))
-	glslf-item (create-read-only-hyperlink-inspector-item 
+	glslf-item (uii-create-read-only-hyperlink-inspector-item 
 		    "Fragment Shader: "
 		    (fn [] "/data/glsl/wave.glslf")
 		    #(handle-wave-glsl-edit retval :glslf-edited "/data/glsl/wave.glslf"))

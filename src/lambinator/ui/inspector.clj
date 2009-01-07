@@ -24,7 +24,14 @@
       (let [[index str-opt option] item]
 	(setter option)))))
 
-(defn create-list-inspector-item 
+(defn uii-create-list-inspector-item 
+  "Create a combo-box inspector item.  This is meant for a static list of
+objects and does not at the moment have the capability to add items dynamically.
+name - name of the object
+options - full list of possible items
+getter - returns the current value from the model
+setter - sets the new value on the model
+stringifier - function used to create display strings out of the items in the options sequence"
   ([name options getter setter stringifier]
      (let [stringifier (if stringifier
 			 stringifier
@@ -57,9 +64,9 @@
        (updater)
        (struct-map inspector-item :name name :editor editor :updater updater)))
   ([name options getter setter]
-     (create-list-inspector-item name options getter setter nil)))
+     (uii-create-list-inspector-item name options getter setter nil)))
 
-(defn count-zeros [str]
+(defn- count-zeros [str]
 	(let [len (.length str)
 	      point (.indexOf str ".")
 	      chars-after (- len point 1)
@@ -68,7 +75,7 @@
 	    [chars-before chars-after]
 	    [chars-after 0])))
 
-(defn try-parse-float[str]
+(defn- try-parse-float[str]
   (if str
     (try
      [true (Float/parseFloat str)]
@@ -76,7 +83,7 @@
        [false (float 0.0)]))
     [false 0.0]))
 
-(defn create-min-size-text-field[preferred-size-ref]
+(defn- create-min-size-text-field[preferred-size-ref]
   (proxy [JTextField] []
     (getPreferredSize [] 
 		      (if @preferred-size-ref
@@ -86,7 +93,19 @@
 ;format-str is in the form of:
 ;00.00 where the zeros indicate how many digits
 ;to account for
-(defn create-float-slider-inspector-item [name min-val max-val getter setter format-str]
+(defn uii-create-float-slider-inspector-item 
+  "Create a float slider inspector item.  This is a slider followed
+by a text box that enables the user to set the values both exactly
+and by using the slider.
+name - name of the item
+min-val - minimum value of the data
+max-val - maximum value of the data
+getter - get the current value from the model.
+setter - set the current value on the model.
+format-str - string in the form of 00.00 where the number of zeros
+  used indicates the number of decimal places you would like.  This string
+  is used for measuring the text box and setting its final size as well."
+  [name min-val max-val getter setter format-str]
   (let [slider (JSlider. )
 	pref-sized-ref (ref nil)
 	input-box (create-min-size-text-field pref-sized-ref)
@@ -152,7 +171,12 @@
     ))
 
 ;onclick takes no arguments.
-(defn create-read-only-hyperlink-inspector-item [name getter onclick]
+(defn uii-create-read-only-hyperlink-inspector-item 
+  "Create a hyperlinked inspector item along with an action to perform on click.
+name - name of the item.
+getter - getter for the current value.
+onclick - operation to perform.  Takes no arguments, returns no value"
+  [name getter onclick]
   (let [retval (JTextPane. )
 	value (getter)
 	updater (fn []
@@ -172,26 +196,39 @@
     (struct-map inspector-item :name name :editor retval :updater updater)))
       
 
-(defn setup-inspector-panel [inPanel inspector-item-seq]
+(defn uii-setup-inspector-panel 
+  "Given a panel and a sequence of inspector items, setup the items in the panel.
+inPanel - panel to use to setup information
+inspector-item-seq - Sequence of inspector items"
+[inPanel inspector-item-seq]
   (. inPanel removeAll)
   (let [layout (GridBagLayout. )
 	constraints (GridBagConstraints. )]
     (. inPanel setLayout (GridBagLayout.))
     (sets! constraints ipadx 1 ipady 1)
-    (doseq [[index item] (map vector (iterate inc 0) inspector-item-seq)]
-      (util-add-with-constraints (JLabel. (item :name)) constraints inPanel
-				 gridx 0
-				 gridy index
-				 ipadx 0
-				 anchor GridBagConstraints/EAST
-				 fill GridBagConstraints/NONE
-				 weightx 0.0)
-      (util-add-with-constraints (item :editor) constraints inPanel
-				 gridx 1
-				 gridy index
-				 ipadx 0
-				 anchor GridBagConstraints/WEST
-				 fill GridBagConstraints/HORIZONTAL
-				 weightx 1.0))
+    (doseq [[index item next] 
+	    (map vector 
+		 (iterate inc 0) 
+		 inspector-item-seq
+		 (rest (lazy-cat inspector-item-seq (list nil))))]
+      (let [[wy anchor-left anchor-right] (if next
+					    [0.0 GridBagConstraints/EAST GridBagConstraints/WEST]
+					    [1.0 GridBagConstraints/NORTHEAST GridBagConstraints/NORTHWEST])]
+	(util-add-with-constraints (JLabel. (item :name)) constraints inPanel
+				   gridx 0
+				   gridy index
+				   ipadx 0
+				   anchor anchor-left
+				   fill GridBagConstraints/NONE
+				   weightx 0.0
+				   weighty wy)
+	(util-add-with-constraints (item :editor) constraints inPanel
+				   gridx 1
+				   gridy index
+				   ipadx 0
+				   anchor anchor-right
+				   fill GridBagConstraints/HORIZONTAL
+				   weightx 1.0
+				   weighty wy)))
     (. inPanel setPreferredSize  (. inPanel getMinimumSize))))
       
