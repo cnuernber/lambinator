@@ -234,7 +234,7 @@
       rc 
       rl
       "/data/glsl/passthrough.glslv" 
-      "/data/glsl/single-texture.glslf"
+      "/data/glsl/single_texture.glslf"
       "wave-final-render-prog")
      (rcgl-create-vbo rc rl "wave-multisample-vbo" :data #(generate-multisample-vbo)))))
 
@@ -263,7 +263,7 @@
 	    transfer-fbo (transfer-surface :gl-handle)
 	    prog-handle (final-prog :gl-handle)
 	    transfer-tex (((transfer-surface :attachments) :color0) :texture-gl-handle)
-	    tex-att-index (((final-prog :attributes) "input-tex-coords") :index)
+	    tex-att-index (((final-prog :attributes) "input_tex_coords") :index)
 	    [render-width render-height] ((ms-surface :surface-spec) :size)
 	    vbo-dtype (int (ms-vbo :gl-datatype))]
 	;have the child render to the multisample fbo
