@@ -129,3 +129,17 @@ passed in"
        (. (Runtime/getRuntime) exec (into-array String cmd-and-args-seq) nil (File. working-dir))))
   ([cmd-and-args]
      (util-run-cmd cmd-and-args nil)))
+
+(defn util-htmlize-string-sequence 
+  "Given a sequence of strings, concatenate them, put <br>s at the 
+end and surround in <html>...</html>"
+  [string-seq]
+  (let [builder (StringBuilder.)]
+    (. builder append "<html>")
+    (let [builder (reduce (fn [builder string] 
+			    (when (> (.length builder) 6)
+			      (. builder append "<br>"))
+			    (. builder append string))
+			  builder 
+			  string-seq)]
+      (. builder toString))))

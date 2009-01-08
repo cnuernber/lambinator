@@ -33,13 +33,15 @@
 	<path location="${table_layout_jar}"/>
       </classpath>
       <sysproperty key="clojure.compile.path" value="${build}"/>
+      <arg value="lambinator.ui.util"/>
+      <arg value="lambinator.ui.gl"/>
+      <arg value="lambinator.ui.inspector"/>
       <arg value="lambinator.ui"/>
       <arg value="lambinator.rc"/>
       <arg value="lambinator.rcgl"/>
       <arg value="lambinator.util"/>
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>
-      <arg value="lambinator.ui.inspector"/>
       <arg value="lambinator.demo.wave"/>
     </java>
   </target>

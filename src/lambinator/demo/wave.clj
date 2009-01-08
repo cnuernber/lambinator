@@ -4,7 +4,7 @@
   (:use lambinator.ui lambinator.rcgl lambinator.rc
 	clojure.contrib.seq-utils lambinator.util
 	lambinator.log lambinator.ui.inspector
-	lambinator.fs)
+	lambinator.fs lambinator.ui.gl)
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)
@@ -12,11 +12,15 @@
 	  (javax.swing SwingUtilities))
   (:gen-class))
 
-(defn with-context-and-tasks-refs[wave-demo-data-ref lambda]
+(defn get-demo-gl-window-data [wave-demo-data-ref]
   (let [fm (@wave-demo-data-ref :frame)
-	rc-ref (ui-get-rcgl-render-context-ref fm)
-	render-tasks-ref (ui-get-render-todo-list-ref fm)]
-    (lambda rc-ref render-tasks-ref)))
+	gl-window-data (ui-get-gl-window-data fm)]
+    gl-window-data))
+
+(defn with-context-and-tasks-refs[wave-demo-data-ref lambda]
+  (uigl-with-render-context-ref-and-todo-list-ref 
+   (get-demo-gl-window-data wave-demo-data-ref)
+   lambda))
 
 ;given a frame, load the wave glsl* files
 (defn load-wave-program [wave-demo-data-ref]
@@ -126,14 +130,14 @@
 (defn create-wave-drawable-fn[wave-demo-data-ref demo-fn]
   (let [fm (@wave-demo-data-ref :frame)
 	current-millis (System/currentTimeMillis)
-	rc-ref (ui-get-rcgl-render-context-ref fm)]
+	rc-ref (uigl-get-render-context-ref (ui-get-gl-window-data fm))]
     #(display-animating-wave-demo % rc-ref wave-demo-data-ref current-millis demo-fn)))
   
 
 (defn setup-wave-demo[wave-demo-data-ref demo-fn]
-  (let [fm (@wave-demo-data-ref :frame)]
-    (ui-set-gl-render-fn fm (create-wave-drawable-fn wave-demo-data-ref demo-fn))
-    (ui-set-fps-animator fm 60)
+  (let [gl-window-data (get-demo-gl-window-data wave-demo-data-ref)]
+    (uigl-set-render-fn gl-window-data (create-wave-drawable-fn wave-demo-data-ref demo-fn))
+    (uigl-set-fps-animator gl-window-data 60)
     nil))
 
 (defn enable-simple-wave-demo[wave-demo-data-ref]
@@ -382,17 +386,17 @@
 
 (defn enable-antialiased-wave-demo [wave-demo-data-ref]
   (let [drawable-fn (create-aa-drawable-fn wave-demo-data-ref)
-	fm (@wave-demo-data-ref :frame)]
+	gl-window-data (get-demo-gl-window-data wave-demo-data-ref)]
     (load-wave-program wave-demo-data-ref)
     (create-wave-vbo wave-demo-data-ref)
     (create-multisample-data wave-demo-data-ref)
-    (ui-set-gl-render-fn fm drawable-fn)
-    (ui-set-fps-animator fm 60)))
+    (uigl-set-render-fn gl-window-data drawable-fn)
+    (uigl-set-fps-animator gl-window-data 60)))
 
 (defn disable-wave-demo[wave-demo-data-ref]
-  (let [fm (@wave-demo-data-ref :frame)]
-    (ui-set-gl-render-fn fm nil)
-    (ui-set-fps-animator fm 5) ;just ensure the window refreshes regularly
+  (let [gl-window-data (get-demo-gl-window-data wave-demo-data-ref)]
+    (uigl-set-render-fn gl-window-data nil)
+    (uigl-set-fps-animator gl-window-data 5) ;just ensure the window refreshes regularly
     (delete-wave-program wave-demo-data-ref)
     (delete-wave-vbo wave-demo-data-ref)
     (delete-multisample-data wave-demo-data-ref)
@@ -411,9 +415,9 @@
 		      (do
 			(create-multisample-data demo-data-ref)
 			(create-aa-drawable-fn demo-data-ref)))
-	fm (@demo-data-ref :frame)]
-    (ui-set-gl-render-fn fm drawable-fn)
-    (ui-set-fps-animator fm 60)))
+	gl-window-data (get-demo-gl-window-data demo-data-ref)]
+    (uigl-set-render-fn gl-window-data drawable-fn)
+    (uigl-set-fps-animator gl-window-data 60)))
 
 (defn demo-setup-inspector-panel [wave-demo-data-ref]
   (let [demo-data @wave-demo-data-ref
