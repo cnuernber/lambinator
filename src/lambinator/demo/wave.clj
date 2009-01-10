@@ -352,8 +352,8 @@
 	      ((item :updater)))))))))
 
 (defmulti get-wave-demo-fn (fn [demo-ref] (@demo-ref :geom-type)))
-(defmethod get-wave-demo-fn :default [-] display-vbo-wave-demo)
-(defmethod get-wave-demo-fn :immediate [-] display-simple-wave-demo)
+(defmethod get-wave-demo-fn :default [_] display-vbo-wave-demo)
+(defmethod get-wave-demo-fn :immediate [_] display-simple-wave-demo)
 
 (defn create-wave-drawable-fn[wave-demo-data-ref demo-fn]
   (let [fm (@wave-demo-data-ref :frame)
