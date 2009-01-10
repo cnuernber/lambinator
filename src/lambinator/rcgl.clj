@@ -2,12 +2,11 @@
   (:use lambinator.rc lambinator.util
 	lambinator.fs clojure.contrib.seq-utils
 	clojure.contrib.except
-	lambinator.log lambinator.rcgl.util)
+	lambinator.log lambinator.rcgl.util
+	lambinator.rcgl.fbo)
   (:import (javax.media.opengl GL)
 	   (java.io File)))
 
-(load "rcgl_texture")
-(load "rcgl_fbo")
 (load "rcgl_glsl")
 (load "rcgl_vbo")
 
@@ -116,31 +115,47 @@
 ;trying to create them.
 (defn rcgl-create-context-surface[render-context-ref render-tasks-ref sspec name]
   (append-to-ref-list render-tasks-ref 
-		      #(create-named-context-surface (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) sspec name)))
+		      #(rcglf-create-named-context-surface 
+			(@render-context-ref :logger-ref) 
+			(. % getGL) 
+			(@render-context-ref :surfaces-ref) 
+			sspec 
+			name)))
 
 ;Create a context surface using a list of fallbacks
 (defn rcgl-create-context-surface-seq[render-context-ref render-tasks-ref sspec-seq name]
   (append-to-ref-list render-tasks-ref 
-		      #(create-named-context-surface-seq (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) sspec-seq name)))
+		      #(rcglf-create-named-context-surface-seq 
+			(@render-context-ref :logger-ref) 
+			(. % getGL) 
+			(@render-context-ref :surfaces-ref) 
+			sspec-seq 
+			name)))
 
 
 ;only runs if the surface exists already
 (defn rcgl-update-context-surface[render-context-ref render-tasks-ref name width height]
   (append-to-ref-list render-tasks-ref 
-		      #(update-named-context-surface (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) name width height)))
+		      #(rcglf-update-named-context-surface 
+			(@render-context-ref :logger-ref) 
+			(. % getGL) 
+			(@render-context-ref :surfaces-ref) 
+			name 
+			width 
+			height)))
 
 (defn rcgl-delete-context-surface[render-context-ref render-tasks-ref name]
   (append-to-ref-list render-tasks-ref 
-		      #(delete-named-context-surface (@render-context-ref :logger-ref) (. % getGL) (@render-context-ref :surfaces-ref) name)))
-
-;this is meant to be called from within the render thread
-(defn rcgl-get-or-create-context-surface[render-context-ref gl sspec name]
-  (get-or-create-context-surface (@render-context-ref :logger-ref) gl (@render-context-ref :surfaces-ref) sspec name))
+		      #(rcglf-delete-named-context-surface 
+			(@render-context-ref :logger-ref) 
+			(. % getGL) 
+			(@render-context-ref :surfaces-ref) 
+			name)))
 
 (defn rcgl-get-context-surface[render-context name]
   (let [surfaces-ref (render-context :surfaces-ref)
 	retval (@surfaces-ref name)]
-    (if (context-surface-valid-for-render retval)
+    (if (rcglf-context-surface-valid-for-render retval)
       retval
       nil)))
 	
@@ -155,5 +170,5 @@
 	  logger-ref :logger-ref } render-context ]
     (resources-released-reload-all-glsl-programs logger-ref drawable programs-ref shaders-ref)
     (vbo-resources-destroyed logger-ref (. drawable getGL) vbos-ref)
-    (context-surfaces-destroyed logger-ref (. drawable getGL) surfaces-ref))
+    (rcglf-context-surfaces-destroyed logger-ref (. drawable getGL) surfaces-ref))
     render-context)

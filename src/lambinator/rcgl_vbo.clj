@@ -26,7 +26,7 @@
 	new-vbo (struct gl-vbo 0 name vbo-type generator)]
     (if data-buffer
       (do
-	(rcgl-fbo-log log-data-ref :info "Creating vbo: " name)
+	(rcgl-vbo-log log-data-ref :info "Creating vbo: " name)
 	
 	(let [vbo-handle (rcglu-allocate-gl-item gl glGenBuffers)
 	      vbo-gl-type (vbo-gl-type-from-vbo-type vbo-type)
@@ -44,7 +44,7 @@
 
 (defn delete-gl-vbo[log-data-ref gl vbo]
   (when (gl-vbo-valid vbo)
-    (rcgl-fbo-log log-data-ref :info "deleting vbo: " (vbo :name))
+    (rcgl-vbo-log log-data-ref :info "deleting vbo: " (vbo :name))
     (rcglu-release-gl-item  gl glDeleteBuffers (vbo :gl-handle)))
   (assoc vbo :gl-handle 0))
 
