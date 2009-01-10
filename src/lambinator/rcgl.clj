@@ -3,11 +3,11 @@
 	lambinator.fs clojure.contrib.seq-utils
 	clojure.contrib.except
 	lambinator.log lambinator.rcgl.util
-	lambinator.rcgl.fbo)
+	lambinator.rcgl.fbo
+	lambinator.rcgl.glsl)
   (:import (javax.media.opengl GL)
 	   (java.io File)))
 
-(load "rcgl_glsl")
 (load "rcgl_vbo")
 
 (defstruct render-context  
@@ -19,7 +19,7 @@
 
 (defn create-render-context [logger-ref]
   (struct render-context 
-	  (create-rcgl-glsl-manager)
+	  (rcglg-create-manager)
 	  (create-loading-system)
 	  (create-vbo-manager)
 	  (ref {})
@@ -39,7 +39,7 @@
     (if (and (fs-file-or-resource-exists? glslv)
 	     (fs-file-or-resource-exists? glslf))
       (do
-	(create-glsl-program-from-files logger-ref programs-ref shaders-ref loading-system render-tasks-ref glslv glslf prog-name )
+	(rcglg-create-program-from-files logger-ref programs-ref shaders-ref loading-system render-tasks-ref glslv glslf prog-name )
 	true)
       false)))
 
@@ -49,11 +49,11 @@
 (defn rcgl-delete-glsl-program[render-context-ref render-tasks-ref prog-name]
   (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager 
 	  logger-ref :logger-ref } @render-context-ref]
-    (append-to-ref-list render-tasks-ref #(delete-rcgl-glsl-program-and-shaders logger-ref % programs-ref shaders-ref prog-name))))
+    (append-to-ref-list render-tasks-ref #(rcglg-delete-program-and-shaders logger-ref % programs-ref shaders-ref prog-name))))
 
 (defn rcgl-set-glsl-uniforms[render-context gl var-pair-seq rcgl-glsl-program]
   (let [logger-ref (render-context :logger-ref)]
-    (set-glsl-prog-uniforms logger-ref gl var-pair-seq rcgl-glsl-program)))
+    (rcglg-set-prog-uniforms logger-ref gl var-pair-seq rcgl-glsl-program)))
 
 (defn rcgl-associate-new-shader [render-context-ref prog-name old-shader-name new-shader-name]
   (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager } @render-context-ref
@@ -72,7 +72,7 @@
   (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager
 	  loading-system :loading-system
 	  logger-ref :logger-ref} @render-context-ref]
-    (begin-shader-load logger-ref programs-ref shaders-ref loading-system render-tasks-ref filename)))
+    (rcglg-begin-shader-load logger-ref programs-ref shaders-ref loading-system render-tasks-ref filename)))
 
 ;vbo type must be either :data or :index
 ;generator is a function that returns a sequence of numbers.  If they are float
@@ -103,7 +103,7 @@
 (defn rcgl-get-glsl-program[render-context prog-name]
   (let [{ { programs-ref :programs-ref } :glsl-manager } render-context
 	program (@programs-ref prog-name)
-	prog-valid (glsl-program-valid program)]
+	prog-valid (rcglg-program-valid program)]
     (if prog-valid
       program
       nil)))
@@ -168,7 +168,7 @@
 	  { vbos-ref :vbos-ref } :vbo-manager 
 	  surfaces-ref :surfaces-ref 
 	  logger-ref :logger-ref } render-context ]
-    (resources-released-reload-all-glsl-programs logger-ref drawable programs-ref shaders-ref)
+    (rcglg-resources-released-reload-all-programs logger-ref drawable programs-ref shaders-ref)
     (vbo-resources-destroyed logger-ref (. drawable getGL) vbos-ref)
     (rcglf-context-surfaces-destroyed logger-ref (. drawable getGL) surfaces-ref))
     render-context)

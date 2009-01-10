@@ -42,6 +42,7 @@
       <arg value="lambinator.rcgl.util"/>
       <arg value="lambinator.rcgl.texture"/>
       <arg value="lambinator.rcgl.fbo"/>
+      <arg value="lambinator.rcgl.glsl"/>
       <arg value="lambinator.util"/>
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>
