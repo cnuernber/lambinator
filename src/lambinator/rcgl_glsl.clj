@@ -59,12 +59,10 @@
       
 ;this works for program info that returns a single long.
 (defn get-gl-program-int-variable[gl program var-name]
-  (allocate-gl-item
-   (fn [count args offset]
-     (. gl glGetProgramiv program var-name args offset))))
+  (rcglu-allocate-gl-item-fn (fn [count args offset] (. gl glGetProgramiv program var-name args offset))))
 
 (defn get-gl-shader-int-variable[gl shader var-name]
-  (allocate-gl-item
+  (rcglu-allocate-gl-item-fn
    (fn [count args offset]
      (. gl glGetShaderiv shader var-name args offset))))
 	  
@@ -97,7 +95,7 @@
 	:filename filename 
 	:md5-hash md5-hash 
 	:status shader-status 
-	:gl-error (get-gl-error gl)))))
+	:gl-error (rcglu-get-gl-error gl)))))
 
 
 (defn delete-glsl-shader[log-data-ref gl shader]
@@ -147,7 +145,7 @@
 					     (struct rcgl-glsl-item 
 						     (String. ~name-byte-buf 0 (aget ~len-buf 0)) 
 						     ~idx (aget ~size-buf 0) (aget ~type-buf 0)
-						     (get-opengl-constant-name (aget ~type-buf 0))))
+						     (rcglu-get-opengl-constant-name (aget ~type-buf 0))))
 					   (range ~item-count))))))))
 
 ;returns a program if the underlying shaders were created successfully
@@ -167,16 +165,16 @@
       (if (== link-status GL/GL_TRUE) 
 	(let [attributes (glsl-get-program-items gl program GL/GL_ACTIVE_ATTRIBUTES GL/GL_ACTIVE_ATTRIBUTE_MAX_LENGTH glGetActiveAttrib)
 	      uniforms (glsl-get-program-items gl program GL/GL_ACTIVE_UNIFORMS GL/GL_ACTIVE_UNIFORM_MAX_LENGTH glGetActiveUniform)]
-	  (assoc retval :attributes attributes :uniforms uniforms :status :valid :gl-error (get-gl-error gl)))
+	  (assoc retval :attributes attributes :uniforms uniforms :status :valid :gl-error (rcglu-get-gl-error gl)))
 	(do
 	  (. gl glDeleteProgram program) ;clean up resources for failed compile
-	  (assoc retval :gl-handle 0 :gl-error (get-gl-error gl)))))))
+	  (assoc retval :gl-handle 0 :gl-error (rcglu-get-gl-error gl)))))))
 
 (defn delete-glsl-program[log-data-ref gl program]
   (when (glsl-program-valid program)
     (rcgl-glsl-log log-data-ref :info "deleting program: " (program :name))
     (. gl glDeleteProgram (program :gl-handle))
-    (assoc program :gl-handle 0 :status :unused :gl-error (get-gl-error gl)))) ;note that this says nothing about the shaders
+    (assoc program :gl-handle 0 :status :unused :gl-error (rcglu-get-gl-error gl)))) ;note that this says nothing about the shaders
 
 (defmulti set-glsl-uniform (fn [log-data-ref gl uniform-entry var-value] (uniform-entry :datatype)))
 ;should log that nothing got set.

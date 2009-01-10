@@ -14,22 +14,11 @@
    (> (vbo :gl-handle) 0)))
 
 (defmulti vbo-gl-type-from-vbo-type identity)
-(defmethod vbo-gl-type-from-vbo-type :default [-] GL/GL_ARRAY_BUFFER)
-(defmethod vbo-gl-type-from-vbo-type :index [-] GL/GL_ELEMENT_ARRAY_BUFFER)
+(defmethod vbo-gl-type-from-vbo-type :default [_] GL/GL_ARRAY_BUFFER)
+(defmethod vbo-gl-type-from-vbo-type :index [_] GL/GL_ELEMENT_ARRAY_BUFFER)
 
 (defn create-invalid-vbo[name vbo-type]
   (struct gl-vbo 0 name vbo-type nil))
-
-(defmulti gl-datatype-from-clojure-type #(class %))
-(defmethod gl-datatype-from-clojure-type :default [-] GL/GL_FLOAT)
-(defmethod gl-datatype-from-clojure-type Short/TYPE [-] GL/GL_SHORT)
-(defmethod gl-datatype-from-clojure-type Byte/TYPE [-] GL/GL_BYTE)
-(defmethod gl-datatype-from-clojure-type Integer/TYPE [-] GL/GL_INT)
-
-(defmulti item-size-from-clojure-type #(class %))
-(defmethod item-size-from-clojure-type :default [-] 4)
-(defmethod item-size-from-clojure-type Short/TYPE [-] 2)
-(defmethod item-size-from-clojure-type Byte/TYPE [-] 1)
 
 ;datatype is one of the rc datatypes, ubyte ushort or float 
 (defn create-gl-vbo [log-data-ref gl name vbo-type data-seq generator]
@@ -39,24 +28,24 @@
       (do
 	(rcgl-fbo-log log-data-ref :info "Creating vbo: " name)
 	
-	(let [vbo-handle (allocate-gl-item (fn [count args offset] (. gl glGenBuffers count args offset)))
+	(let [vbo-handle (rcglu-allocate-gl-item gl glGenBuffers)
 	      vbo-gl-type (vbo-gl-type-from-vbo-type vbo-type)
-	      gl-datatype (gl-datatype-from-clojure-type (first data-seq))
+	      gl-datatype (rcglu-gl-datatype-from-clojure-type (first data-seq))
 	      item-count (. data-buffer limit)
-	      data-size (* item-count (item-size-from-clojure-type (first data-seq)))]
+	      data-size (* item-count (rcglu-gl-item-byte-size gl-datatype))]
 	  (. gl glBindBuffer vbo-gl-type vbo-handle)
 	  (. gl glBufferData vbo-gl-type data-size data-buffer GL/GL_STATIC_DRAW )
 	  (assoc new-vbo 
 	    :gl-handle vbo-handle 
 	    :gl-datatype gl-datatype 
 	    :item-count item-count 
-	    :gl-error (get-gl-error gl))))
+	    :gl-error (rcglu-get-gl-error gl))))
       new-vbo)))
 
 (defn delete-gl-vbo[log-data-ref gl vbo]
   (when (gl-vbo-valid vbo)
     (rcgl-fbo-log log-data-ref :info "deleting vbo: " (vbo :name))
-    (release-gl-item (fn [count args offset] (. gl glDeleteBuffers count args offset)) (vbo :gl-handle)))
+    (rcglu-release-gl-item  gl glDeleteBuffers (vbo :gl-handle)))
   (assoc vbo :gl-handle 0))
 
 (defn add-new-vbo [gl vbos-ref name vbo-type ]

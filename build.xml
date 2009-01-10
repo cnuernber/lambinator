@@ -39,6 +39,7 @@
       <arg value="lambinator.ui"/>
       <arg value="lambinator.rc"/>
       <arg value="lambinator.rcgl"/>
+      <arg value="lambinator.rcgl.util"/>
       <arg value="lambinator.util"/>
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>

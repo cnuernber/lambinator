@@ -45,21 +45,8 @@
 (defstruct cubemap-spec :top :bottom :left :right :front :back)
 (defstruct color :r :g :b :a)
 
-
-;Now we start with render command definitions
-;The scene will assume that its surface spec is allocated
-;and set as relative FBO index 0.
-;A scene is an implicit allocate and release of surface 0.
-;furthermore, when a scene is finished all relative surfaces
-;still held, if any other than relative surface 0,
-;should be released.
-(def render-command-types 
-     [:scene-render-command
-      :allocate-surface-render-command 
-      :release-surface-render-command])
-(defstruct scene-render-command :render-command-type :surface-spec :clear-color )
-
-(defn create-texture-spec [format type width height]
+(defn create-texture-spec 
+  [format type width height]
   (struct texture-spec type format [width height]))
 
 (defn create-mipmapped-texture-spec [texture count]
@@ -67,40 +54,6 @@
 
 (defn create-color [r g b a]
   (struct color r g b a))
-
-
-;do details; type and format match
-(defn texture-details-match [texture1 texture2]
-  (and (= (texture1 :datatype)
-	   (texture2 :datatype))
-       (= (texture1 :format)
-	   (texture2 :format))))
-
-;ignoring width and height, could you substitute
-;surface1 for surface2
-(defn surface-details-match [surface1 surface2]
-  (and (= (surface1 :attachments)
-	  (surface2 :attachments))
-       (= (surface1 :multi-sample)
-	  (surface2 :multi-sample))))
-
-;how many bytes would you have to allocate to
-;fit desired in surface
-;Assume you aren't going to shrink a surface
-(defn bytes-required [surface desired]
-  (let [[sw sh] ( surface :size)
-	[dw dh] (desired :size)
-	max (fn [s d] (if (> d s) d s))]
-    (if (and (>= sw dw)
-	     (>= sh dh))
-      0
-      (- (* (max sw dw) (max sh dh)) (* sh sw)))))
-
-(defn overdraw [surface desired]
-  (let [[sw sh] (surface :size)
-	[dw dh] (desired :size)]
-    (- (* sw sh) (* dw dh))))
-
 
 (def renderbuffer-types [:color :depth])
 (defstruct renderbuffer-data 

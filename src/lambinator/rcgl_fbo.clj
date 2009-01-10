@@ -28,18 +28,18 @@
 
 ;takes a gl and returns a framebuffer index
 (defn allocate-opengl-framebuffer-object [gl]
-  (allocate-gl-item (fn [count args offset] (. gl glGenFramebuffersEXT count args offset))))
+  (rcglu-allocate-gl-item gl glGenFramebuffersEXT ))
 
 ;takes a gl and a fbo handle, calls release and returns an invalid handle value
 (defn release-opengl-framebuffer-object [gl fbo-handle]
-  (release-gl-item (fn [count args offset] (. gl glDeleteFramebuffersEXT count args offset)) fbo-handle)
+  (rcglu-release-gl-item gl glDeleteFramebuffersEXT fbo-handle)
   0)
 
 (defn allocate-opengl-framebuffer-renderbuffer [gl]
-  (allocate-gl-item (fn [count args offset] (. gl glGenRenderbuffersEXT count args offset))))
+  (rcglu-allocate-gl-item gl glGenRenderbuffersEXT ))
 
 (defn release-opengl-framebffer-renderbuffer [gl rb-hdl]
-  (release-gl-item (fn [count args offset] (. gl glDeleteRenderbuffersEXT count args offset)) rb-hdl))
+  (rcglu-release-gl-item gl glDeleteRenderbuffersEXT rb-hdl))
 
 (defmulti gl-attachment-point-from-rc-attachment-point identity)
 (defmethod gl-attachment-point-from-rc-attachment-point :color0 [-] GL/GL_COLOR_ATTACHMENT0_EXT)
@@ -55,7 +55,7 @@
     (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal-format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl-attach-pt GL/GL_RENDERBUFFER_EXT rb-handle)
-    (struct context-renderbuffer rb-handle 0 (get-gl-error gl))))
+    (struct context-renderbuffer rb-handle 0 (rcglu-get-gl-error gl))))
 
 (defn create-and-bind-textured-renderbuffer[gl internal-format width height external-format external-datatype attach-pt binding-func]
   (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
@@ -69,32 +69,31 @@
        GL/GL_FRAMEBUFFER_EXT 
        (gl-attachment-point-from-rc-attachment-point attach-pt) GL/GL_TEXTURE_2D 
        tex-handle 0)
-    (struct context-renderbuffer rb-handle tex-handle (get-gl-error gl))))	
+    (struct context-renderbuffer rb-handle tex-handle (rcglu-get-gl-error gl))))	
 
 (defmulti create-context-rb (fn [gl attach-pt renderbuffer width height] [(renderbuffer :type) (renderbuffer :use-texture)]))
 (defmethod create-context-rb [:color false] [gl attach-pt renderbuffer width height]
   (let [rc-format (renderbuffer :color-format)
 	rc-dtype (renderbuffer :color-datatype)
-	internal-format (gl-internal-format-from-texture-format-and-type rc-format rc-dtype)]
+	internal-format (rcglu-gl-internal-format-from-rc-format-and-type rc-format rc-dtype)]
     (create-and-bind-renderbuffer gl internal-format width height attach-pt)))
 
 (defmethod create-context-rb [:color true] [gl attach-pt renderbuffer width height]
   (let [rc-format (renderbuffer :color-format)
 	rc-dtype (renderbuffer :color-datatype)]
-    (let [internal-format (gl-internal-format-from-texture-format-and-type rc-format rc-dtype)
-	  external-format (gl-external-format-from-texture-format rc-format)
-	  external-datatype (gl-external-datatype-from-texture-datatype rc-dtype)]
+    (let [internal-format (rcglu-gl-internal-format-from-rc-format-and-type rc-format rc-dtype)
+	  external-format (rcglu-gl-format-from-rc-format rc-format)
+	  external-datatype (rcglu-gl-datatype-from-rc-datatype rc-dtype)]
       (create-and-bind-textured-renderbuffer gl internal-format width height external-format external-datatype attach-pt nil))))
 
 (defmethod create-context-rb [:depth false] [gl attach-pt renderbuffer width height]
-  (let [depth-constant (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))]
+  (let [depth-constant (rcglu-convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))]
     (create-and-bind-renderbuffer gl depth-constant width height attach-pt)))
 
 
 (defmethod create-context-rb [:depth true] [gl attach-pt renderbuffer width height]
   (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
-	depth-constant (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))
-	internal-format (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))
+	internal-format (rcglu-convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))
 	tex-handle (allocate-opengl-texture-handle gl)
 	external-format GL/GL_DEPTH_COMPONENT
 	external-datatype GL/GL_FLOAT
@@ -119,7 +118,7 @@
     (. gl glRenderbufferStorageMultisampleEXT GL/GL_RENDERBUFFER_EXT gl-num-samples internal-format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl-attach-pt GL/GL_RENDERBUFFER_EXT rb-handle)
-    (struct context-renderbuffer rb-handle 0 (get-gl-error gl))))
+    (struct context-renderbuffer rb-handle 0 (rcglu-get-gl-error gl))))
 
 (defn create-multisample-renderbuffer-dispatch [log-data-ref gl attach-pt renderbuffer & args] (renderbuffer :type))
 
@@ -128,11 +127,11 @@
 (defmethod create-multisample-renderbuffer :color [log-data-ref gl attach-pt renderbuffer width height num-samples]
   (let [rc-format (renderbuffer :color-format)
 	rc-dtype (renderbuffer :color-datatype)
-	internal-format (gl-internal-format-from-texture-format-and-type rc-format rc-dtype)]
+	internal-format (rcglu-gl-internal-format-from-rc-format-and-type rc-format rc-dtype)]
     (create-and-bind-multisample-renderbuffer log-data-ref gl attach-pt width height internal-format num-samples)))
 
 (defmethod create-multisample-renderbuffer :depth [log-data-ref gl attach-pt renderbuffer width height num-samples]
-  (let [internal-format (convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))]
+  (let [internal-format (rcglu-convert-depth-bits-to-gl-constant (renderbuffer :depth-bits))]
     (create-and-bind-multisample-renderbuffer log-data-ref gl attach-pt width height internal-format num-samples)))
 
 (defn create-context-surface[log-data-ref gl sspec name]
@@ -155,14 +154,14 @@
 				      (apply assoc {} context-renderbuffers)
 				      {})
 	   complete (. gl glCheckFramebufferStatusEXT GL/GL_FRAMEBUFFER_EXT)]
-       (rcgl-fbo-log log-data-ref :info "Framebuffer complete: " (get-opengl-constant-name complete))
+       (rcgl-fbo-log log-data-ref :info "Framebuffer complete: " (rcglu-get-opengl-constant-name complete))
        (struct-map context-surface 
 	 :gl-handle fbo-handle 
 	 :surface-spec sspec 
 	 :attachments context-renderbuffer-map 
 	 :framebuffer-status complete
 	 :name name
-	 :gl-error (get-gl-error gl)))
+	 :gl-error (rcglu-get-gl-error gl)))
      (catch Exception e 
        ;this is important, if an exception is thrown at a bad time
        ;then unless you release the fbo object your program will
@@ -185,7 +184,7 @@
     (struct-map context-surface
       :gl-handle 0
       :attachments {}
-      :gl-error (get-gl-error gl))))
+      :gl-error (rcglu-get-gl-error gl))))
 
 (defn update-context-surface[log-data-ref gl ctx-sface newWidth newHeight]
   (delete-context-surface log-data-ref gl ctx-sface)

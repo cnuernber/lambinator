@@ -2,11 +2,10 @@
   (:use lambinator.rc lambinator.util
 	lambinator.fs clojure.contrib.seq-utils
 	clojure.contrib.except
-	lambinator.log)
+	lambinator.log lambinator.rcgl.util)
   (:import (javax.media.opengl GL)
 	   (java.io File)))
 
-(load "rcgl_defs")
 (load "rcgl_texture")
 (load "rcgl_fbo")
 (load "rcgl_glsl")
