@@ -4,7 +4,8 @@
   (:use lambinator.ui lambinator.rcgl lambinator.rc
 	clojure.contrib.seq-utils lambinator.util
 	lambinator.log lambinator.ui.inspector
-	lambinator.fs lambinator.ui.gl)
+	lambinator.fs lambinator.ui.gl
+	lambinator.rcgl.vbo)
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)
@@ -180,12 +181,12 @@
      wave-height
      (fn [#^GL gl]
        (. gl glEnableClientState GL/GL_VERTEX_ARRAY)
-       (. gl glBindBuffer (vbo-gl-type-from-vbo-type (wave-data :type)) (wave-data :gl-handle))
+       (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (wave-data :type)) (wave-data :gl-handle))
        (. gl glVertexPointer (int 2) (int (wave-data :gl-datatype)) (int 0) (long 0))
        ;glDrawArrays takes the index count, not the polygon count or the array item count
        (. gl glDrawArrays GL/GL_QUADS 0 (/ (wave-data :item-count) 2)) ;each index has an x and y
        (. gl glDisableClientState GL/GL_VERTEX_ARRAY)
-       (. gl glBindBuffer (vbo-gl-type-from-vbo-type (wave-data :type)) 0)
+       (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (wave-data :type)) 0)
        (. gl glUseProgram 0)))))
 
 (defn enable-vbo-wave-demo[wave-demo-data-ref]
@@ -300,7 +301,7 @@
 	 (. gl glUseProgram prog-handle)
 	 (. gl glEnableClientState GL/GL_VERTEX_ARRAY)
 	 (. gl glEnableVertexAttribArray tex-att-index)
-	 (. gl glBindBuffer (vbo-gl-type-from-vbo-type (ms-vbo :type)) (ms-vbo :gl-handle))
+	 (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) (ms-vbo :gl-handle))
 	 (. gl glEnable GL/GL_TEXTURE_2D)
 	 (. gl glActiveTexture GL/GL_TEXTURE0)
 	 (. gl glBindTexture GL/GL_TEXTURE_2D transfer-tex)
@@ -329,7 +330,7 @@
 	 (. gl glDrawArrays GL/GL_QUADS 0 (/ (ms-vbo :item-count) 4)) ;each index has an x and y, u and v
 	 (. gl glDisableClientState GL/GL_VERTEX_ARRAY)
 	 (. gl glActiveTexture GL/GL_TEXTURE0)
-	 (. gl glBindBuffer (vbo-gl-type-from-vbo-type (ms-vbo :type)) 0)
+	 (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) 0)
 	 (finally
 	  (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))) ;make goddamn sure we don't end up with an invalid fbo bound.
       

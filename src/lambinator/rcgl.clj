@@ -4,11 +4,10 @@
 	clojure.contrib.except
 	lambinator.log lambinator.rcgl.util
 	lambinator.rcgl.fbo
-	lambinator.rcgl.glsl)
+	lambinator.rcgl.glsl
+	lambinator.rcgl.vbo)
   (:import (javax.media.opengl GL)
 	   (java.io File)))
-
-(load "rcgl_vbo")
 
 (defstruct render-context  
   :glsl-manager 
@@ -21,7 +20,7 @@
   (struct render-context 
 	  (rcglg-create-manager)
 	  (create-loading-system)
-	  (create-vbo-manager)
+	  (rcglv-create-manager)
 	  (ref {})
 	  logger-ref))
     
@@ -82,19 +81,19 @@
 (defn rcgl-create-vbo [render-context-ref render-tasks-ref buf-name vbo-type generator]
   (let [{ { vbos-ref :vbos-ref } :vbo-manager  
 	  logger-ref :logger-ref } @render-context-ref]
-    (append-to-ref-list render-tasks-ref #(create-vbo logger-ref (. % getGL) vbos-ref buf-name vbo-type generator))))
+    (append-to-ref-list render-tasks-ref #(rcglv-create-named-vbo logger-ref (. % getGL) vbos-ref buf-name vbo-type generator))))
 
 (defn rcgl-delete-vbo [render-context-ref render-tasks-ref buf-name]
   (let [{ { vbos-ref :vbos-ref } :vbo-manager  
 	  logger-ref :logger-ref } @render-context-ref]
-    (append-to-ref-list render-tasks-ref #(delete-vbo logger-ref (. % getGL) vbos-ref buf-name ))))
+    (append-to-ref-list render-tasks-ref #(rcglv-delete-named-vbo logger-ref (. % getGL) vbos-ref buf-name ))))
 
 ;Functions below are query functions of the render context.
 ;They take a non-ref'd context as they don't change the context
 (defn rcgl-get-vbo [render-context name]
   (let [{ { vbos-ref :vbos-ref } :vbo-manager } render-context
 	retval (@vbos-ref name)]
-    (if (gl-vbo-valid retval)
+    (if (rcglv-vbo-valid retval)
       retval
       nil)))
 
@@ -169,6 +168,6 @@
 	  surfaces-ref :surfaces-ref 
 	  logger-ref :logger-ref } render-context ]
     (rcglg-resources-released-reload-all-programs logger-ref drawable programs-ref shaders-ref)
-    (vbo-resources-destroyed logger-ref (. drawable getGL) vbos-ref)
+    (rcglv-vbo-resources-destroyed logger-ref (. drawable getGL) vbos-ref)
     (rcglf-context-surfaces-destroyed logger-ref (. drawable getGL) surfaces-ref))
     render-context)
