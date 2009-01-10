@@ -5,7 +5,8 @@
 	clojure.contrib.seq-utils lambinator.util
 	lambinator.log lambinator.ui.inspector
 	lambinator.fs lambinator.ui.gl
-	lambinator.rcgl.vbo)
+	lambinator.rcgl.vbo
+	lambinator.rcgl.texture )
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)
@@ -128,23 +129,6 @@
 	wave-height (@wave-demo-data-ref :wave-height)]
     (demo-fn drawable render-context-ref wave-time wave-width wave-height)))
 
-(defn create-wave-drawable-fn[wave-demo-data-ref demo-fn]
-  (let [fm (@wave-demo-data-ref :frame)
-	current-millis (System/currentTimeMillis)
-	rc-ref (uigl-get-render-context-ref (ui-get-gl-window-data fm))]
-    #(display-animating-wave-demo % rc-ref wave-demo-data-ref current-millis demo-fn)))
-  
-
-(defn setup-wave-demo[wave-demo-data-ref demo-fn]
-  (let [gl-window-data (get-demo-gl-window-data wave-demo-data-ref)]
-    (uigl-set-render-fn gl-window-data (create-wave-drawable-fn wave-demo-data-ref demo-fn))
-    (uigl-set-fps-animator gl-window-data 60)
-    nil))
-
-(defn enable-simple-wave-demo[wave-demo-data-ref]
-  (load-wave-program wave-demo-data-ref)
-  (setup-wave-demo wave-demo-data-ref display-simple-wave-demo))
-
 ;generate a set of nexted vectors, one for each quad.
 ;flatten this out into straight up vectors
 (defn wave-geom-generator[]
@@ -188,11 +172,6 @@
        (. gl glDisableClientState GL/GL_VERTEX_ARRAY)
        (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (wave-data :type)) 0)
        (. gl glUseProgram 0)))))
-
-(defn enable-vbo-wave-demo[wave-demo-data-ref]
-  (load-wave-program wave-demo-data-ref)
-  (create-wave-vbo wave-demo-data-ref)
-  (setup-wave-demo wave-demo-data-ref display-vbo-wave-demo))
 
 (defn generate-multisample-vbo[]
   (map 
@@ -305,10 +284,10 @@
 	 (. gl glEnable GL/GL_TEXTURE_2D)
 	 (. gl glActiveTexture GL/GL_TEXTURE0)
 	 (. gl glBindTexture GL/GL_TEXTURE_2D transfer-tex)
-	 (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
-	 (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
-	 (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
-	 (. gl glTexParameteri GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
+	 (rcglt-tex2d-param gl GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
+	 (rcglt-tex2d-param gl GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
+	 (rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
+	 (rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
         ;we have how bound the second set of texture coordinates to tex coord 0
 	;each tex coord takes two entries, they have a stride of 4
 	;and they are offset from the beginning of the array by two
@@ -375,6 +354,12 @@
 (defmulti get-wave-demo-fn (fn [demo-ref] (@demo-ref :geom-type)))
 (defmethod get-wave-demo-fn :default [-] display-vbo-wave-demo)
 (defmethod get-wave-demo-fn :immediate [-] display-simple-wave-demo)
+
+(defn create-wave-drawable-fn[wave-demo-data-ref demo-fn]
+  (let [fm (@wave-demo-data-ref :frame)
+	current-millis (System/currentTimeMillis)
+	rc-ref (uigl-get-render-context-ref (ui-get-gl-window-data fm))]
+    #(display-animating-wave-demo % rc-ref wave-demo-data-ref current-millis demo-fn)))
 
 (defn create-aa-drawable-fn[wave-demo-data-ref]
   (let [frame-resize-data (ref {:resize-frame-count 0 :resize-frame-size [0 0]})
