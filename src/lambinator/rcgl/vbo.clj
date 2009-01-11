@@ -102,8 +102,4 @@
 			 @vbos-ref)]
     (when new-vbos
       (dosync (ref-set vbos-ref (apply assoc @vbos-ref new-vbos))))))
-
-
-(defstruct vbo-manager :vbos-ref) ;vbos mapped to names
-(defn rcglv-create-manager [] (struct vbo-manager (ref {})))
 				 

@@ -10,19 +10,21 @@
 	   (java.io File)))
 
 (defstruct render-context  
-  :glsl-manager 
+  :glsl-programs
+  :glsl-shaders
   :loading-system
   :vbo-manager
   :surfaces-ref
   :logger-ref)
 
 (defn create-render-context [logger-ref]
-  (struct render-context 
-	  (rcglg-create-manager)
-	  (create-loading-system)
-	  (rcglv-create-manager)
-	  (ref {})
-	  logger-ref))
+  (struct-map render-context 
+    :glsl-programs-ref (ref {})
+    :glsl-shaders-ref (ref {})
+    :loading-system (create-loading-system)
+    :vbos-ref (ref {})
+    :surfaces-ref (ref {})
+    :logger-ref logger-ref))
     
 ;OK to call outside render thread.  You can find the program
 ;via the name you passed in later.
@@ -30,11 +32,12 @@
 ;false if one of them does not.
 ;this takes the ref because it is a public, outside render thread function.
 (defn rcgl-create-glsl-program[render-context-ref render-tasks-ref glslv-filename glslf-filename prog-name]
-  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager
+  (let [{ programs-ref :glsl-programs-ref shaders-ref :glsl-shaders-ref
 	  loading-system :loading-system 
 	  logger-ref :logger-ref } @render-context-ref
-	glslv (fs-get-full-path glslv-filename)
-	glslf (fs-get-full-path glslf-filename)]
+       
+	  glslv (fs-get-full-path glslv-filename)
+	  glslf (fs-get-full-path glslf-filename)]
     (if (and (fs-file-or-resource-exists? glslv)
 	     (fs-file-or-resource-exists? glslf))
       (do
@@ -46,7 +49,7 @@
   (dosync (ref-set render-tasks-ref (conj @render-tasks-ref lmbda))))
 
 (defn rcgl-delete-glsl-program[render-context-ref render-tasks-ref prog-name]
-  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager 
+  (let [{ programs-ref :glsl-programs-ref shaders-ref :glsl-shaders-ref
 	  logger-ref :logger-ref } @render-context-ref]
     (append-to-ref-list render-tasks-ref #(rcglg-delete-program-and-shaders logger-ref % programs-ref shaders-ref prog-name))))
 
@@ -55,7 +58,7 @@
     (rcglg-set-prog-uniforms logger-ref gl var-pair-seq rcgl-glsl-program)))
 
 (defn rcgl-associate-new-shader [render-context-ref prog-name old-shader-name new-shader-name]
-  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager } @render-context-ref
+  (let [{ programs-ref :glsl-programs-ref shaders-ref :glsl-shaders-ref } @render-context-ref
 	existing (@programs-ref prog-name)]
     (when existing
       (let [keyword (if (= ((existing :vert-shader) :filename) old-shader-name)
@@ -68,7 +71,7 @@
 								   (assoc (existing keyword) :filename new-shader-name)))))))))))
 
 (defn rcgl-load-shader [render-context-ref render-tasks-ref filename]
-  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager
+  (let [{ programs-ref :glsl-programs-ref shaders-ref :glsl-shaders-ref
 	  loading-system :loading-system
 	  logger-ref :logger-ref} @render-context-ref]
     (rcglg-begin-shader-load logger-ref programs-ref shaders-ref loading-system render-tasks-ref filename)))
@@ -79,19 +82,19 @@
 ;Finally, if they are short, then you get a short buffer.  So pay attention
 ;when you are creating the sequence.
 (defn rcgl-create-vbo [render-context-ref render-tasks-ref buf-name vbo-type generator]
-  (let [{ { vbos-ref :vbos-ref } :vbo-manager  
+  (let [{ vbos-ref :vbos-ref   
 	  logger-ref :logger-ref } @render-context-ref]
     (append-to-ref-list render-tasks-ref #(rcglv-create-named-vbo logger-ref (. % getGL) vbos-ref buf-name vbo-type generator))))
 
 (defn rcgl-delete-vbo [render-context-ref render-tasks-ref buf-name]
-  (let [{ { vbos-ref :vbos-ref } :vbo-manager  
+  (let [{ vbos-ref :vbos-ref
 	  logger-ref :logger-ref } @render-context-ref]
     (append-to-ref-list render-tasks-ref #(rcglv-delete-named-vbo logger-ref (. % getGL) vbos-ref buf-name ))))
 
 ;Functions below are query functions of the render context.
 ;They take a non-ref'd context as they don't change the context
 (defn rcgl-get-vbo [render-context name]
-  (let [{ { vbos-ref :vbos-ref } :vbo-manager } render-context
+  (let [{ vbos-ref :vbos-ref } render-context
 	retval (@vbos-ref name)]
     (if (rcglv-vbo-valid retval)
       retval
@@ -100,7 +103,7 @@
 ;Returns the glsl program mapped to this name
 ;or nil if the program doesn't exist or is invalid.
 (defn rcgl-get-glsl-program[render-context prog-name]
-  (let [{ { programs-ref :programs-ref } :glsl-manager } render-context
+  (let [{ programs-ref :glsl-programs-ref } render-context
 	program (@programs-ref prog-name)
 	prog-valid (rcglg-program-valid program)]
     (if prog-valid
@@ -163,8 +166,8 @@
 ;The ones that can be regenerated will be.
 ;returns a new render context
 (defn rcgl-resources-destroyed[drawable render-context]
-  (let [{ { programs-ref :programs-ref shaders-ref :shaders-ref } :glsl-manager 
-	  { vbos-ref :vbos-ref } :vbo-manager 
+  (let [{ programs-ref :glsl-programs-ref shaders-ref :glsl-shaders-ref
+	  vbos-ref :vbos-ref
 	  surfaces-ref :surfaces-ref 
 	  logger-ref :logger-ref } render-context ]
     (rcglg-resources-released-reload-all-programs logger-ref drawable programs-ref shaders-ref)

@@ -417,8 +417,3 @@ it will log a message and keep the existing program."
 	(rcglg-check-rcglg-delete-shader log-data-ref drawable programs-ref shaders-ref glslv)
 	(rcglg-check-rcglg-delete-shader log-data-ref drawable programs-ref shaders-ref glslf)))))
 	    
-
-
-(defstruct rcgl-glsl-manager :programs-ref :shaders-ref)
-(defn rcglg-create-manager [] 
-  (struct rcgl-glsl-manager (ref {}) (ref {})))

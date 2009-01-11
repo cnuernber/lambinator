@@ -170,7 +170,7 @@ error during load"
   (let [full-file-name (fs-get-full-path fname)
 	actions-map-ref (loading-system :file-actions)
 	exists (fs-file-or-resource-exists? fname)]
-    (if exists 
+     (if exists 
       (let [existing (add-filename-action actions-map-ref full-file-name task)]
 	(when (not existing)
 	  (let [load-agent (agent {})]
