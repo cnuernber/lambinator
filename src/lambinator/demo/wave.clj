@@ -385,8 +385,8 @@
     (uigl-set-fps-animator gl-window-data 5) ;just ensure the window refreshes regularly
     (delete-wave-program wave-demo-data-ref)
     (delete-wave-vbo wave-demo-data-ref)
-    (delete-multisample-data wave-demo-data-ref)
-    nil))
+    (delete-multisample-data wave-demo-data-ref))
+  nil)
 
 (defonce geom-choices-array [:immediate :vbo])
 (defstruct wave-demo-data :frame :wave-freq :wave-width :wave-height 
@@ -458,15 +458,14 @@
     (util-run-cmd ["open" edited])))
 
 ;this has to run from the swing event thread.
-(defn do-create-wave-demo[retval]
+(defn do-create-wave-demo[frame retval]
   (dosync (ref-set retval (struct-map wave-demo-data
 			    :wave-freq 1.0
 			    :wave-width 0.1
 			    :wave-height 3.0
 			    :num-samples :4
 			    :geom-type :vbo)))
-  (let [frame (ui-create-app-frame "Wave Demo")
-	aa-item (uii-create-list-inspector-item 
+  (let [aa-item (uii-create-list-inspector-item 
 		 "Antialiasing: " ;item name
 		 aa-choices-array ;choices
 		 (fn [] (@retval :num-samples)) ;getter
@@ -519,7 +518,6 @@
 		    #(handle-wave-glsl-edit retval :glslf-edited "/data/glsl/wave.glslf"))
 	inspector-items [aa-item geom-item freq-item width-item height-item glslv-item glslf-item]]
     (dosync (ref-set retval (assoc @retval :inspector-items inspector-items :frame frame)))
-    (ui-add-hook frame :close-hooks-ref #(disable-wave-demo retval))
     (demo-setup-inspector-panel retval)
     (reset-wave-demo retval)
     (. (frame :frame) setVisible true)
@@ -528,9 +526,13 @@
 
 (defn create-wave-demo[]
   (let [retval (ref nil)]
-    (SwingUtilities/invokeLater #(do-create-wave-demo retval))
+    (SwingUtilities/invokeLater (fn []
+				  (let [frame (ui-create-app-frame "Wave Demo" )]
+				    (do-create-wave-demo frame retval))))
     retval))
 
 (defn- -main [& args]
   (let [demo-data (create-wave-demo)]
-    (SwingUtilities/invokeLater #(ui-add-hook (@demo-data :frame) :close-hooks-ref (fn [] (System/exit 0))))))
+    (SwingUtilities/invokeLater (fn []
+				  (disable-wave-demo demo-data)
+				  (ui-add-hook (@demo-data :frame) :close-hooks-ref (fn [] (System/exit 0)))))))

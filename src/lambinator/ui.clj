@@ -149,8 +149,7 @@ capabilities - a GLCapabilities object or nil"
        (SwingUtilities/invokeLater 
 	(fn [] 
 	  (. (. window-mgr getToolWindow "Log") setActive true)
-	  (. (. window-mgr getToolWindow "Inspector") setActive true)
-	  (. frame setVisible true)))
+	  (. (. window-mgr getToolWindow "Inspector") setActive true)))
        (let [retval (struct-map ui-frame-data 
 		      :frame frame
 		      :win-data win-data
@@ -211,6 +210,42 @@ capabilities - a GLCapabilities object or nil"
 							 (ui-add-log-message retval module type args)))))
 	 retval)))
   ([appName] (ui-create-app-frame appName nil)))
+
+(defn- get-menu-bar[frame]
+  (let [jframe (frame :frame)]
+    (.getJMenuBar jframe)))
+  
+
+(defn ui-get-top-level-menu-item
+  "Return a top level menu item of a particular name"
+  [frame name]
+  (let [mbar (get-menu-bar frame)
+	name-items (map (fn [index]
+			  (let [comp (.getComponent mbar index)]
+			    [(.getText comp ) comp]))
+			(range (.getComponentCount mbar)))
+	existing (first (filter (fn [[item-name comp]] (= item-name name)) name-items))]
+    (when existing
+      (second existing))))
+
+(defn ui-remove-top-level-menu-item
+  "Remove a top level menu item of a particular name"
+  [frame name]
+  (let [mbar (get-menu-bar frame)
+	item (ui-get-top-level-menu-item frame name)]
+    (when item
+      (.remove mbar item))))
+
+(defn ui-create-top-level-menu-item
+  "Return a top level menu item of a particular name"
+  [frame name]
+  (let [mbar (get-menu-bar frame)
+	new-item (JMenu. name)]
+    (ui-remove-top-level-menu-item frame name)
+    (.add mbar new-item)))
+
+(defn ui-get-inspector-panel [frame]
+  (frame :inspector-pane))
 
 ;:close-hooks-ref
 ;:hidden-hooks-ref
