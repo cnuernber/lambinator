@@ -1,5 +1,5 @@
 #!/bin/sh -e 
-java \
+java -server\
  -Dsun.java2d.opengl=true -Dsun.java2d.opengl.fbobject=true -cp \
 $CLASSPATH:\
 /Users/chrisn/dev/editor/lambinator/lambinator.jar:\
