@@ -300,3 +300,8 @@ inFPS - the new fps to run things at"
     (uigl-disable-fps-animator gl-window-data)
     (. animator start)
     (dosync (ref-set animator-ref animator))))
+
+(defn uigl-repaint [gl-window-data]
+  (let [{drawable :gl-win} gl-window-data]
+    (.revalidate drawable)
+    (.repaint drawable)))

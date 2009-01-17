@@ -4,7 +4,8 @@
   (:use lambinator.ui
 	lambinator.ui.util
 	lambinator.ui.inspector
-	lambinator.demo.wave )
+	lambinator.demo.wave
+	lambinator.demo.functional )
   (:import (javax.swing SwingUtilities))
   (:gen-class))
 
@@ -14,7 +15,7 @@
 reference to a nil object that they fill out internally"}
      all-demos-name-fns
      [["Wave Demo" do-create-wave-demo disable-wave-demo]
-      ["Functional Graphics" nil nil]])
+      ["Functional Graphics" dmfn-create-demo-data dmfn-destroy-demo-data]])
 
 (defn dm-cleanup-current-demo [demo-data]
   (let [cleanup-fn @(demo-data :cleanup-cur-demo-ref)
@@ -33,6 +34,7 @@ reference to a nil object that they fill out internally"}
     (when create
       (create frame sub-data))
     ;ensure an update of the inspector panel
+    (.revalidate (ui-get-inspector-panel (demo-data :frame)))
     (.repaint (ui-get-inspector-panel (demo-data :frame)))
     (dosync
      (ref-set (demo-data :cleanup-cur-demo-ref) destroy)
@@ -55,15 +57,20 @@ Assumes you are running in the swing thread"
 	(uiut-create-menu-item name menu-fn menu-item)))
     demo-data))
 
+(defn dm-setup-all-demos
+  "This needs to be run from the swing thread"
+  []
+  (let [frame (ui-create-app-frame "Cool Demos")
+	demo-data (dm-create-all-demos-menu frame)]
+    (. (frame :frame) setVisible true)
+    (ui-add-hook 
+     frame 
+     :close-hooks-ref 
+     (fn [] 
+       (dm-cleanup-current-demo demo-data)
+       (System/exit 0)))))
+  
+
 
 (defn- -main [& args]
-  (SwingUtilities/invokeLater (fn []
-				(let [frame (ui-create-app-frame "Cool Demos")
-				      demo-data (dm-create-all-demos-menu frame)]
-				  (. (frame :frame) setVisible true)
-				  (ui-add-hook 
-				   frame 
-				   :close-hooks-ref 
-				   (fn [] 
-				     (dm-cleanup-current-demo demo-data)
-				     (System/exit 0)))))))
+  (SwingUtilities/invokeLater #(dm-setup-all-demos)))

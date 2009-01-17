@@ -6,7 +6,8 @@
 	lambinator.log lambinator.ui.inspector
 	lambinator.fs lambinator.ui.gl
 	lambinator.rcgl.vbo
-	lambinator.rcgl.texture )
+	lambinator.rcgl.texture
+	lambinator.demo.util )
   (:import (java.io File)
 	  (javax.media.opengl GL DebugGL)
 	  (javax.media.opengl.glu GLU)
@@ -173,184 +174,6 @@
        (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (wave-data :type)) 0)
        (. gl glUseProgram 0)))))
 
-(defn generate-multisample-vbo[]
-  (map 
-   float
-   [-1 -1  0 0
-    -1  1  0 1
-     1  1  1 1
-     1 -1  1 0]))
-
-(defonce aa-choices-array [:none :2 :4 :8 :16])
-
-(defn create-multisample-fbos[wave-demo-data-ref]
-  (let [{ { { drawable :gl-win } :win-data } :frame } @wave-demo-data-ref
-	width (. drawable getWidth)
-	height (. drawable getHeight)
-	num-samples (@wave-demo-data-ref :num-samples)
-	indexed-choices-array (map vector (iterate inc 0) (rest aa-choices-array))
-	[this-choice-index -] (first (filter (fn [[index choice]] (= choice num-samples)) indexed-choices-array))
-	;pick aa modes that are less than or equal to the chosen aa mode so we have valid fallbacks
-	valid-choices (reverse (filter (fn [[index choice]] (>= this-choice-index index)) indexed-choices-array))
-	ms-spec-seq (map (fn [[index choice]]
-			   (create-surface-spec 
-			    { :color0 (create-renderbuffer :color :ubyte :rgb false) }
-			    width
-			    height
-			    choice))
-			 valid-choices )
-	trans-spec (create-surface-spec
-		    { :color0 (create-renderbuffer :color :ubyte :rgb  true) }
-		    width
-		    height)]
-    (with-context-and-tasks-refs 
-     wave-demo-data-ref
-     (fn [rc rl]
-       (rcgl-create-context-surface-seq rc rl ms-spec-seq "wave-multisample-surface")
-       (rcgl-create-context-surface rc rl trans-spec "wave-transfer-surface")))))
-
-(defn create-multisample-data[wave-demo-data-ref]
-  (create-multisample-fbos wave-demo-data-ref)
-  (with-context-and-tasks-refs 
-   wave-demo-data-ref
-   (fn [rc rl]
-     (rcgl-create-glsl-program 
-      rc 
-      rl
-      "/data/glsl/passthrough.glslv" 
-      "/data/glsl/single_texture.glslf"
-      "wave-final-render-prog")
-     (rcgl-create-vbo rc rl "wave-multisample-vbo" :data #(generate-multisample-vbo)))))
-
-(defn delete-multisample-data[wave-demo-data-ref]
-  (with-context-and-tasks-refs 
-   wave-demo-data-ref
-   (fn [rc rl]
-     (rcgl-delete-context-surface rc rl "wave-multisample-surface")
-     (rcgl-delete-context-surface rc rl "wave-transfer-surface")
-     (rcgl-delete-glsl-program rc rl "wave-final-render-prog")
-     (rcgl-delete-vbo rc rl "wave-multisample-vbo"))))
-
-(defn antialiasing-drawable-wrapper[drawable render-context-ref frame-resize-data wave-demo-data-ref child-drawable]
-  (let [real-gl (. drawable getGL)
-	#^GL gl (DebugGL. real-gl)
-	width (. drawable getWidth)
-	height (. drawable getHeight)
-	render-context @render-context-ref
-	ms-surface (rcgl-get-context-surface render-context "wave-multisample-surface")
-	transfer-surface (rcgl-get-context-surface render-context "wave-transfer-surface")
-	final-prog (rcgl-get-glsl-program render-context "wave-final-render-prog")
-	ms-vbo (rcgl-get-vbo render-context "wave-multisample-vbo")
-	do-aa-render (and ms-surface transfer-surface final-prog child-drawable ms-vbo)]
-    (if do-aa-render
-      (let [ms-fbo (ms-surface :gl-handle)
-	    transfer-fbo (transfer-surface :gl-handle)
-	    prog-handle (final-prog :gl-handle)
-	    transfer-tex (((transfer-surface :attachments) :color0) :texture-gl-handle)
-	    tex-att-index (((final-prog :attributes) "input_tex_coords") :index)
-	    [render-width render-height] ((ms-surface :surface-spec) :size)
-	    vbo-dtype (int (ms-vbo :gl-datatype))]
-	;have the child render to the multisample fbo
-	;the bind function sets where gl will render to
-	(. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT ms-fbo)
-	(try
-	 (. gl glViewport 0 0 render-width render-height)
-	 (child-drawable drawable)
-					;bind the multisample framebuffer as the read framebuffer source
-	 (. gl glBindFramebufferEXT GL/GL_READ_FRAMEBUFFER_EXT ms-fbo)
-					;bind the transfer as the draw framebuffer dest
-	 (. gl glBindFramebufferEXT GL/GL_DRAW_FRAMEBUFFER_EXT transfer-fbo);
-        ;downsample the multisample fbo to the draw framebuffer's texture
-	 (. gl glBlitFramebufferEXT 
-	    0 0 render-width render-height ;source rect
-	    0 0 render-width render-height ;dest rect
-	    GL/GL_COLOR_BUFFER_BIT ;what to copy over (just color in our case)
-	    GL/GL_NEAREST ) ;how to interpolate intermediate results (there aren't any; the sizes match)
-
-        ;Bind the window's render surface as the target render surface
-	 (. gl GL/glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)
-	 (. gl glViewport 0 0 width height)
-	;Now we render our fullscreen quad
-	 (. gl glShadeModel GL/GL_SMOOTH)
-	 (. gl glPolygonMode GL/GL_FRONT_AND_BACK GL/GL_FILL)
-	 (. gl glMatrixMode GL/GL_PROJECTION)
-	 (. gl glLoadIdentity )
-	 (. gl glMatrixMode GL/GL_MODELVIEW)
-	 (. gl glLoadIdentity)
-	 (. gl glUseProgram prog-handle)
-	 (. gl glEnableClientState GL/GL_VERTEX_ARRAY)
-	 (. gl glEnableVertexAttribArray tex-att-index)
-	 (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) (ms-vbo :gl-handle))
-	 (. gl glEnable GL/GL_TEXTURE_2D)
-	 (. gl glActiveTexture GL/GL_TEXTURE0)
-	 (. gl glBindTexture GL/GL_TEXTURE_2D transfer-tex)
-	 (rcglt-tex2d-param gl GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
-	 (rcglt-tex2d-param gl GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
-	 (rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
-	 (rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
-        ;we have how bound the second set of texture coordinates to tex coord 0
-	;each tex coord takes two entries, they have a stride of 4
-	;and they are offset from the beginning of the array by two
-	 (. gl glVertexAttribPointer 
-	    tex-att-index ;index
-	    (int 2)       ;size
-	    vbo-dtype     ;type
-	    false         ;normalized
-	    (int 16)       ;stride
-	    (long 8))      ;offset
-	 (rcgl-set-glsl-uniforms
-	  @render-context-ref
-	  gl
-	  [["tex" 0]] ;set the texture param to desired logical texture unit
-	  final-prog )
-        ; Render Fullscreen Quad
-	 (. gl glVertexPointer (int 2) (int (ms-vbo :gl-datatype)) (int 16) (long 0))
-					;glDrawArrays takes the index count, not the polygon count or the array item count
-	 (. gl glDrawArrays GL/GL_QUADS 0 (/ (ms-vbo :item-count) 4)) ;each index has an x and y, u and v
-	 (. gl glDisableClientState GL/GL_VERTEX_ARRAY)
-	 (. gl glActiveTexture GL/GL_TEXTURE0)
-	 (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) 0)
-	 (finally
-	  (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))) ;make goddamn sure we don't end up with an invalid fbo bound.
-      
-      (when child-drawable ;if we can't render antialiased because we don't have buffers
-	(child-drawable drawable)))
-    ;update frame resize data so we know how many times the drawable has rendered at this exact size
-    ;we only resize when a certain number of frames have been rendered at a certain size.
-    ;this is because resizing fbos is relative expensive and can apparently lead
-    ;to fragmentation of video ram (although I doubt the second claim)
-    (let [resize-frame-count (@frame-resize-data :resize-frame-count)
-	  [rs-width rs-height] (@frame-resize-data :resize-frame-size)
-	  resize-frame-count (if (and (== rs-width width)
-				      (== rs-height height))
-			       (inc resize-frame-count)
-			       0)
-	  fbos-missing (or (not ms-surface)
-			   (not transfer-surface))
-	  fbos-size-mismatch (or fbos-missing
-				 (not (= ((ms-surface :surface-spec) :size)
-					 [width height])))
-	  do-resize-fbo (or fbos-missing
-			    (and fbos-size-mismatch
-				 (> resize-frame-count 10)))]
-      (dosync (ref-set frame-resize-data (assoc @frame-resize-data 
-					   :resize-frame-count resize-frame-count
-					   :resize-frame-size [width height])))
-      (when do-resize-fbo
-	(create-multisample-fbos wave-demo-data-ref)))
-    (when ms-surface
-      (let [actual-sample-count ((ms-surface :surface-spec) :multi-sample)]
-	(when (not (= (@wave-demo-data-ref :num-samples)
-		      actual-sample-count))
-	  (dosync (ref-set wave-demo-data-ref (assoc @wave-demo-data-ref :num-samples actual-sample-count)))
-	  ;update ui to reflect reality which, due to differenes
-	  ;in hardware, may not match what the user wanted.
-	  (let [item (first (filter 
-			     (fn [item] (= (item :name) "Antialiasing: "))
-			     (@wave-demo-data-ref :inspector-items)))]
-	    (when item
-	      ((item :updater)))))))))
-
 (defmulti get-wave-demo-fn (fn [demo-ref] (@demo-ref :geom-type)))
 (defmethod get-wave-demo-fn :default [_] display-vbo-wave-demo)
 (defmethod get-wave-demo-fn :immediate [_] display-simple-wave-demo)
@@ -361,46 +184,31 @@
 	rc-ref (uigl-get-render-context-ref (ui-get-gl-window-data fm))]
     #(display-animating-wave-demo % rc-ref wave-demo-data-ref current-millis demo-fn)))
 
-(defn create-aa-drawable-fn[wave-demo-data-ref]
-  (let [frame-resize-data (ref {:resize-frame-count 0 :resize-frame-size [0 0]})
-	fm (@wave-demo-data-ref :frame)
-	rc-ref ((fm :win-data) :render-context-ref)
-	drawable-fn (create-wave-drawable-fn wave-demo-data-ref (get-wave-demo-fn wave-demo-data-ref))
-	aa-drawable-fn #(antialiasing-drawable-wrapper % rc-ref frame-resize-data wave-demo-data-ref drawable-fn)]
-    aa-drawable-fn))
-  
-
-(defn enable-antialiased-wave-demo [wave-demo-data-ref]
-  (let [drawable-fn (create-aa-drawable-fn wave-demo-data-ref)
-	gl-window-data (get-demo-gl-window-data wave-demo-data-ref)]
-    (load-wave-program wave-demo-data-ref)
-    (create-wave-vbo wave-demo-data-ref)
-    (create-multisample-data wave-demo-data-ref)
-    (uigl-set-render-fn gl-window-data drawable-fn)
-    (uigl-set-fps-animator gl-window-data 60)))
-
 (defn disable-wave-demo[wave-demo-data-ref]
   (let [gl-window-data (get-demo-gl-window-data wave-demo-data-ref)]
     (uigl-set-render-fn gl-window-data nil)
     (uigl-set-fps-animator gl-window-data 5) ;just ensure the window refreshes regularly
     (delete-wave-program wave-demo-data-ref)
     (delete-wave-vbo wave-demo-data-ref)
-    (delete-multisample-data wave-demo-data-ref))
+    (dmut-delete-multisample-render-data (@wave-demo-data-ref :multisample-data)))
   nil)
 
 (defonce geom-choices-array [:immediate :vbo])
 (defstruct wave-demo-data :frame :wave-freq :wave-width :wave-height 
-	   :num-samples :geom-type :inspector-items
+	   :multisample-data :geom-type :inspector-items
 	   :glslv-edited :glslf-edited)
 
 (defn reset-wave-demo[demo-data-ref]
   (load-wave-program demo-data-ref)
   (create-wave-vbo demo-data-ref)
-  (let [drawable-fn (if (= (@demo-data-ref :num-samples) :none)
-		      (create-wave-drawable-fn demo-data-ref (get-wave-demo-fn demo-data-ref))
-		      (do
-			(create-multisample-data demo-data-ref)
-			(create-aa-drawable-fn demo-data-ref)))
+  (let [multisample-data (@demo-data-ref :multisample-data)
+	num-samples @(multisample-data :num-samples-ref)
+	local-drawable-fn  (create-wave-drawable-fn demo-data-ref (get-wave-demo-fn demo-data-ref))
+	drawable-fn (if (= num-samples :none)
+		      local-drawable-fn
+		      (do 
+			(dmut-create-multisample-render-data multisample-data)
+			(dmut-create-aa-drawable-fn multisample-data local-drawable-fn)))
 	gl-window-data (get-demo-gl-window-data demo-data-ref)]
     (uigl-set-render-fn gl-window-data drawable-fn)
     (uigl-set-fps-animator gl-window-data 60)))
@@ -463,19 +271,10 @@
 			    :wave-freq 1.0
 			    :wave-width 0.1
 			    :wave-height 3.0
-			    :num-samples :4
+			    :multisample-data (dmut-create-multisample-data frame #(reset-wave-demo retval))
 			    :geom-type :vbo)))
-  (let [aa-item (uii-create-list-inspector-item 
-		 "Antialiasing: " ;item name
-		 aa-choices-array ;choices
-		 (fn [] (@retval :num-samples)) ;getter
-		 (fn [val] 
-		   (dosync (ref-set retval (assoc @retval :num-samples val)))
-		   (reset-wave-demo retval)) ;setter
-		 (fn [item]
-		   (if (= item :none)
-		     "none"
-		     (util-stringify (name item) "x"))))
+	  
+  (let [aa-item ((@retval :multisample-data) :inspector-item)
 	geom-item (uii-create-list-inspector-item
 		   "Geom Render Mode: " ;name
 		   geom-choices-array   ;options 

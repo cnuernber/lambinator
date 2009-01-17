@@ -48,7 +48,11 @@
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>
       <arg value="lambinator.demo"/>
+      <arg value="lambinator.demo.util"/>
       <arg value="lambinator.demo.wave"/>
+      <arg value="lambinator.demo.fishparts"/>
+      <arg value="lambinator.demo.functionalgraphics"/>
+      <arg value="lambinator.demo.functional"/>
     </java>
   </target>
 
