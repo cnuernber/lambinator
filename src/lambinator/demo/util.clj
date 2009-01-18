@@ -108,6 +108,7 @@
 	    vbo-dtype (int (ms-vbo :gl-datatype))]
 	;have the child render to the multisample fbo
 	;the bind function sets where gl will render to
+	(. gl glPushAttrib GL/GL_ALL_ATTRIB_BITS)
 	(. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT ms-fbo)
 	(try
 	 (. gl glViewport 0 0 render-width render-height)
@@ -161,16 +162,18 @@
 	  gl
 	  [["tex" 0]] ;set the texture param to desired logical texture unit
 	  final-prog )
-        ; Render Fullscreen Quad
+         ; Render Fullscreen Quad
 	 (. gl glVertexPointer (int 2) (int (ms-vbo :gl-datatype)) (int 16) (long 0))
-					;glDrawArrays takes the index count, not the polygon count or the array item count
+	 ;glDrawArrays takes the index count, not the polygon count or the array item count
 	 (. gl glDrawArrays GL/GL_QUADS 0 (/ (ms-vbo :item-count) 4)) ;each index has an x and y, u and v
 	 (finally	 
 	  (. gl glDisableClientState GL/GL_VERTEX_ARRAY)
 	  (. gl glActiveTexture GL/GL_TEXTURE0)
 	  (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) 0)
 	  (. gl glUseProgram 0)
-	  (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)))) ;make goddamn sure we don't end up with an invalid fbo bound.
+	  (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT 0)
+	  (. gl glPopAttrib )
+	  ))) ;make goddamn sure we don't end up with an invalid fbo bound.
       
       (when child-drawable ;if we can't render antialiased because we don't have buffers
 	(child-drawable drawable)))

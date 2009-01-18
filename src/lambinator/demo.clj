@@ -60,17 +60,19 @@ Assumes you are running in the swing thread"
 (defn dm-setup-all-demos
   "This needs to be run from the swing thread"
   []
-  (let [frame (ui-create-app-frame "Cool Demos")
-	demo-data (dm-create-all-demos-menu frame)]
-    (. (frame :frame) setVisible true)
-    (ui-add-hook 
-     frame 
-     :close-hooks-ref 
-     (fn [] 
-       (dm-cleanup-current-demo demo-data)
-       (System/exit 0)))))
+  (SwingUtilities/invokeLater 
+   (fn []
+     (let [frame (ui-create-app-frame "Cool Demos")
+	   demo-data (dm-create-all-demos-menu frame)]
+       (. (frame :frame) setVisible true)
+       (ui-add-hook 
+	frame 
+	:close-hooks-ref 
+	(fn [] 
+	  (dm-cleanup-current-demo demo-data)
+	  (System/exit 0)))))))
   
 
 
 (defn- -main [& args]
-  (SwingUtilities/invokeLater #(dm-setup-all-demos)))
+   (dm-setup-all-demos))
