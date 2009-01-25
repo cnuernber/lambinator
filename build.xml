@@ -53,6 +53,28 @@
       <arg value="lambinator.demo.fishparts"/>
       <arg value="lambinator.demo.functionalgraphics"/>
       <arg value="lambinator.demo.functional"/>
+      <arg value="swank.swank"/>
+      <arg value="swank.commands"/>
+      <arg value="swank.commands.basic"/>
+      <arg value="swank.commands.contrib"/>
+      <arg value="swank.commands.contrib.swank-arglists"/>
+      <arg value="swank.commands.contrib.swank-c-p-c"/>
+      <arg value="swank.commands.indent"/>
+      <arg value="swank.commands.inspector"/>
+      <arg value="swank.core"/>
+      <arg value="swank.core.connection"/>
+      <arg value="swank.core.hooks"/>
+      <arg value="swank.core.protocol"/>
+      <arg value="swank.core.server"/>
+      <arg value="swank.core.threadmap"/>
+      <arg value="swank.util.clojure"/>
+      <arg value="swank.util.concurrent.mbox"/>
+      <arg value="swank.util.concurrent.thread"/>
+      <arg value="swank.util.hooks"/>
+      <arg value="swank.util.io"/>
+      <arg value="swank.util.net.sockets"/>
+      <arg value="swank.util.string"/>
+      <arg value="swank.util.sys"/>
     </java>
   </target>
 
