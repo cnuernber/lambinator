@@ -14,7 +14,11 @@
 	   (org.noos.xing.mydoggy.plaf MyDoggyToolWindowManager)) ;forcing async to sync
   (:use lambinator.util lambinator.rcgl lambinator.log
 	clojure.contrib.seq-utils
-	lambinator.fs lambinator.ui.gl lambinator.ui.util))
+	lambinator.fs lambinator.ui.gl lambinator.ui.util
+	swank.swank
+	(swank.core connection server)
+	clojure.main 
+	clojure.contrib.duck-streams ))
 
 
 ;creates all necessary ref's structs and returns a 
@@ -120,7 +124,20 @@ the log window text with new text"
 
 (defn ui-get-gl-window-data [frame-data]
   (frame-data :win-data))
-  
+
+;Used so items can find themselves from the repl
+(def ui-app-frames (ref nil))
+
+
+(defn ui-start-swank-server
+  "Start a swank server.  I think this prints out
+a port number but I am not certain"
+  [frame-data logger-ref]
+  (with-bindings 
+    (let [fname (.getCanonicalPath (fs-get-temp-file "swank"))]
+      (start-server fname)
+      (log-message @logger-ref "ui" :info "Started swank server: " (slurp fname)))))
+		    
 (defn ui-create-app-frame 
   "Create the application frame.  A frame consists of a central GLJPanel along with
 a log tool window and an inspector tool window
@@ -142,7 +159,9 @@ capabilities - a GLCapabilities object or nil"
        (.. frame getContentPane (add window-mgr))
        (. (. window-mgr getContentManager) addContent "gl-panel" nil nil panel)
        (. bar add menu)
-       (uiut-create-menu-item "OpenGL" (fn [ignored] (display-opengl-properties win-data frame)) menu)
+       (uiut-create-menu-item "OpenGL" 
+			      (fn [_] (display-opengl-properties win-data frame)) 
+			      menu)
        (. frame setJMenuBar bar)
        (. frame setSize 1000 600)
        
@@ -196,7 +215,10 @@ capabilities - a GLCapabilities object or nil"
 				      (let [printed-messages-ref (ref nil)]
 					(. @filemod-timer 
 					   schedule  
-					   (create-timer-task #(check-and-update-log-window (retval :log-messages-ref) printed-messages-ref log-label))
+					   (create-timer-task #(check-and-update-log-window 
+								(retval :log-messages-ref) 
+								printed-messages-ref 
+								log-label))
 					   (Date.) 
 					   (long 300))))
 				    
@@ -207,7 +229,13 @@ capabilities - a GLCapabilities object or nil"
 	 (. frame addComponentListener component-listener)
 	 (dosync (ref-set logger-ref (log-add-listener @logger-ref 
 						       (fn [module type & args]
-							 (ui-add-log-message retval module type args)))))
+							 (ui-add-log-message 
+							  retval 
+							  module 
+							  type 
+							  args)))))
+	 (dosync (alter ui-app-frames conj retval))
+	 (uiut-create-menu-item "Start Swank" (fn [_] (ui-start-swank-server retval logger-ref)) menu)
 	 retval)))
   ([appName] (ui-create-app-frame appName nil)))
 

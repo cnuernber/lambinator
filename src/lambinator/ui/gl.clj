@@ -205,6 +205,7 @@ logger_ref reference to a logger or nil"
 	listener (create-gl-event-listener 
 		  window-data)]
     (. panel addGLEventListener listener)
+    (.show panel)
     window-data))
 
 (defn uigl-get-gl-system-property [name gl-window-data]
@@ -217,6 +218,8 @@ logger_ref reference to a logger or nil"
 	pane (JScrollPane. lbl 
 			   ScrollPaneConstants/VERTICAL_SCROLLBAR_AS_NEEDED
 			   ScrollPaneConstants/HORIZONTAL_SCROLLBAR_NEVER)]
+    (.show lbl)
+    (.show pane)
     pane))
 
 (defmulti uigl-create-control (fn [type data] type))
@@ -234,6 +237,7 @@ gl system variables on the panel"
 	controls (map (fn [[key display-name type]]
 			(let [new-label (uiut-create-html-label display-name)
 			      preferred-size (.getPreferredSize new-label)]
+			  (.show new-label)
 			  (.setMinimumSize new-label (Dimension. 
 						      (.width preferred-size) 
 						      (.. new-label getMinimumSize height)))
