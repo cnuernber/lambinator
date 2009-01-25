@@ -83,7 +83,7 @@
     :use-texture use-texture)) ;true if you want a texture from this buffer.
 
 
-(def surface-attachment-points [:color0 :color1 :color2 :color3 :depthl])
+(def surface-attachment-points [:color0 :color1 :color2 :color3 :depth])
 (def multisample-num-samples [:2 :4 :8 :16])
 ;a surface can have several attachments.  It *has* to have color0, but other than that
 ;it is up to you; if you want to have multiple render target support then you need to create
@@ -98,7 +98,7 @@
      (when multi-sample
        (util-throw-if-item-missing multi-sample 
 			      multisample-num-samples 
-			      "datatype must be multisample-num-samples: " multi-sample))
+			      "datatype must be nil or multisample-num-samples: " multi-sample))
      (struct-map surface-spec 
        :attachments attachments
        :size [width height]

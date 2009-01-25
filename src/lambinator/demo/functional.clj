@@ -36,7 +36,7 @@
     (doseq [[{sx :x sy :y} {ex :x ey :y}] fishes]
       (. gl glColor4f 0.0 0.5 1.5 1.0)
       (. gl glVertex2f sx sy)
-      (. gl glColor4f 0.5 0.5 0.0 1.0)
+      (. gl glColor4f 0.5 0.5 1.0 1.0)
       (. gl glVertex2f ex ey))
     (. gl glEnd)))
 
