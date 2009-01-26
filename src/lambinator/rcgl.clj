@@ -5,7 +5,8 @@
 	lambinator.log lambinator.rcgl.util
 	lambinator.rcgl.fbo
 	lambinator.rcgl.glsl
-	lambinator.rcgl.vbo)
+	lambinator.rcgl.vbo
+	lambinator.rcgl.texture)
   (:import (javax.media.opengl GL)
 	   (java.io File)))
 
@@ -15,7 +16,8 @@
   :loading-system
   :vbo-manager
   :surfaces-ref
-  :logger-ref)
+  :logger-ref
+  :texture-map-ref)
 
 (defn create-render-context [logger-ref]
   (struct-map render-context 
@@ -24,7 +26,8 @@
     :loading-system (create-loading-system)
     :vbos-ref (ref {})
     :surfaces-ref (ref {})
-    :logger-ref logger-ref))
+    :logger-ref logger-ref
+    :texture-map-ref (ref {})))
     
 ;OK to call outside render thread.  You can find the program
 ;via the name you passed in later.
@@ -160,7 +163,26 @@
     (if (rcglf-context-surface-valid-for-render retval)
       retval
       nil)))
-	
+
+
+(defn rcgl-allocate-context-texture[render-context-ref render-tasks-ref texture-spec name]
+  (let [texture-map-ref (@render-context-ref :texture-map-ref)]
+    (append-to-ref-list render-tasks-ref
+			#(rcglt-create-context-texture
+			  (.getGL %)
+			  texture-map-ref
+			  texture-spec
+			  name))))
+
+
+(defn rcgl-destroy-context-texture[render-context-ref render-tasks-ref name]
+  (let [texture-map-ref (@render-context-ref :texture-map-ref)]
+    (append-to-ref-list render-tasks-ref
+			#(rcglt-destroy-context-texture
+			  (.getGL %)
+			  texture-map-ref
+			  name))))	
+
 
 ;This is called when all of the resources were destroyed through nefarious means.
 ;The ones that can be regenerated will be.

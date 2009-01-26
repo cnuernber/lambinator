@@ -118,7 +118,7 @@
     :frag-shader (struct-map rcgl-glsl-shader :filename glslf-filename :status :invalid)
     :name prog-name))
 
-(defmacro glsl-get-program-items [gl program active-int max-name-len-int get-mber-fn]
+(defmacro glsl-get-program-items [gl program active-int max-name-len-int get-mber-fn locate-mber-fn]
   `(let [item-count# (get-gl-program-int-variable ~gl ~program ~active-int)
 	 max-name-len# (get-gl-program-int-variable ~gl ~program ~max-name-len-int)
 	 name-byte-buf# (make-array Byte/TYPE max-name-len#)
@@ -131,10 +131,11 @@
      (apply hash-map (doall (mapcat (fn [item#] [(item# :name) item#]) 
 				    (map (fn [idx#] 
 					   (. ~gl ~get-mber-fn ~program idx# max-name-len# len-buf# 0 size-buf# 0 type-buf# 0 name-byte-buf# 0)
+					   (let [name# (String. name-byte-buf# 0 (aget len-buf# 0))]
 					   (struct rcgl-glsl-item 
-						   (String. name-byte-buf# 0 (aget len-buf# 0)) 
-						   idx# (aget size-buf# 0) (aget type-buf# 0)
-						   (rcglu-get-opengl-constant-name (aget type-buf# 0))))
+						   name#
+						   (. ~gl ~locate-mber-fn ~program name#) (aget size-buf# 0) (aget type-buf# 0)
+						   (rcglu-get-opengl-constant-name (aget type-buf# 0)))))
 					 (range item-count#)))))))
 
 ;returns a program if the underlying shaders were created successfully
@@ -154,8 +155,20 @@
 	  retval (struct rcgl-glsl-program vert-shader frag-shader program log-str name [] [] :invalid)]
       ;if it linked successfully then we check out its uniform variables and its attributes
       (if (== link-status GL/GL_TRUE) 
-	(let [attributes (glsl-get-program-items gl program GL/GL_ACTIVE_ATTRIBUTES GL/GL_ACTIVE_ATTRIBUTE_MAX_LENGTH glGetActiveAttrib)
-	      uniforms (glsl-get-program-items gl program GL/GL_ACTIVE_UNIFORMS GL/GL_ACTIVE_UNIFORM_MAX_LENGTH glGetActiveUniform)]
+	(let [attributes (glsl-get-program-items 
+			  gl 
+			  program 
+			  GL/GL_ACTIVE_ATTRIBUTES 
+			  GL/GL_ACTIVE_ATTRIBUTE_MAX_LENGTH 
+			  glGetActiveAttrib 
+			  glGetAttribLocation)
+	      uniforms (glsl-get-program-items 
+			gl 
+			program 
+			GL/GL_ACTIVE_UNIFORMS 
+			GL/GL_ACTIVE_UNIFORM_MAX_LENGTH 
+			glGetActiveUniform
+			glGetUniformLocation )]
 	  (assoc retval :attributes attributes :uniforms uniforms :status :valid :gl-error (rcglu-get-gl-error gl)))
 	(do
 	  (. gl glDeleteProgram program) ;clean up resources for failed compile

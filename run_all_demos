@@ -1,4 +1,4 @@
-#!/bin/sh -e 
+#!/bin/sh 
 java -cp $CLASSPATH:lambinator.jar:lib/mydoggy-api-1.4.2.jar:\
 lib/mydoggy-plaf-1.4.2.jar:lib/mydoggy-res-1.4.2.jar:lib/TableLayout-20050920.jar\
  -Dsun.java2d.opengl=true -Dsun.java2d.opengl.fbobject=true \

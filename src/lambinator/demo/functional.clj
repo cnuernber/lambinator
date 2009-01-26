@@ -69,6 +69,6 @@
 		 frame 
 		 #(create-and-set-drawable-fn retval fishes))]
     (dosync (ref-set retval ms-data))
-;    (uigl-disable-fps-animator uigl)
-    (uigl-set-fps-animator uigl 5)
+    (uigl-disable-fps-animator uigl)
+;    (uigl-set-fps-animator uigl 5)
     (create-and-set-drawable-fn retval fishes)))

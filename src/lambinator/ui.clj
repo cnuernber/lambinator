@@ -16,7 +16,6 @@
 	clojure.contrib.seq-utils
 	lambinator.fs lambinator.ui.gl lambinator.ui.util
 	swank.swank
-	(swank.core connection server)
 	clojure.main 
 	clojure.contrib.duck-streams ))
 

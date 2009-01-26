@@ -142,21 +142,26 @@ getGL"
    (catch Exception e
      (. e printStackTrace))))
 
-
 (defn- gl-display 
   [drawable gl-window-data]
   (let [todo-items-ref (gl-window-data :gl-todo-list-ref)
 	todo-items (reverse @todo-items-ref)
-	render-fn @(gl-window-data :gl-render-fn-ref)]
+	render-fn @(gl-window-data :gl-render-fn-ref)
+	gl (.getGL drawable)
+	int-array (make-array Integer/TYPE 1)]
     (dosync (ref-set todo-items-ref nil))
+    (. gl glGetIntegerv GL/GL_FRAMEBUFFER_BINDING_EXT int-array 0)
     (doseq [item todo-items]
       (run-gl-drawable drawable item))
+    ;Anything that allocates an FBO may set the wrong base fbo up when finished
+    (. gl GL/glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT (aget int-array 0))
     (if render-fn
       (run-gl-drawable drawable render-fn)
-      (let [gl (. drawable getGL)] ;clear to an ugly color to get attention
+      (do
 	(. gl glClearColor 0.05 0.05 0.1 1.0)
-	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))))
-
+	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))
+    (. gl glPopClientAttrib )
+    (. gl glPopAttrib )))
 
 (defn- gl-display-changed 
   [drawable modelChanged devChanged gl-window-data]

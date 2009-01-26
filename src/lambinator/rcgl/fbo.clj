@@ -170,6 +170,7 @@ is relatively easy to create invalid surface specs"
      (if has-multi-sample
        (rcgl-fbo-log log-data-ref :info "creating multi-sample context surface: " name " , number of samples: " num-samples )
        (rcgl-fbo-log log-data-ref :info "creating context surface: " name))
+     (. gl glEnable GL/GL_TEXTURE_2D)
      (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT fbo-handle)
      (let [context-renderbuffer-mapcat-fn (if has-multi-sample
 					    (fn [[attach-pt renderbuffer]]

@@ -3,5 +3,6 @@ varying vec2 tex_coords;
 
 void main()
 {	
-	gl_FragColor = texture2D(tex,tex_coords.st);
+	vec4 tex_lookup = texture2D(tex,tex_coords.st);
+	gl_FragColor = tex_lookup;
 }
