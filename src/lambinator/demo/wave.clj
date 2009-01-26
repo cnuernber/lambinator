@@ -272,8 +272,7 @@
 			    :wave-width 0.1
 			    :wave-height 3.0
 			    :multisample-data (dmut-create-multisample-data frame #(reset-wave-demo retval))
-			    :geom-type :vbo)))
-	  
+			    :geom-type :immediate)))
   (let [aa-item ((@retval :multisample-data) :inspector-item)
 	geom-item (uii-create-list-inspector-item
 		   "Geom Render Mode: " ;name

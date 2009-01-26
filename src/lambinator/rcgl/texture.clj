@@ -78,4 +78,4 @@ upload any information"
 				    name)])
 			   @texture-map-ref)]
     (when new-values
-      (dosync (ref-set texture-map-ref (hash-map new-values))))))
+      (dosync (ref-set texture-map-ref (apply hash-map new-values))))))

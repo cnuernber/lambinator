@@ -189,10 +189,13 @@
 ;returns a new render context
 (defn rcgl-resources-destroyed[drawable render-context]
   (let [{ programs-ref :glsl-programs-ref shaders-ref :glsl-shaders-ref
-	  vbos-ref :vbos-ref
-	  surfaces-ref :surfaces-ref 
-	  logger-ref :logger-ref } render-context ]
+	 vbos-ref :vbos-ref
+	 surfaces-ref :surfaces-ref 
+	 texture-map-ref :texture-map-ref
+	 logger-ref :logger-ref } render-context
+	  gl (.getGL drawable)]
     (rcglg-resources-released-reload-all-programs logger-ref drawable programs-ref shaders-ref)
-    (rcglv-vbo-resources-destroyed logger-ref (. drawable getGL) vbos-ref)
-    (rcglf-context-surfaces-destroyed logger-ref (. drawable getGL) surfaces-ref))
-    render-context)
+    (rcglv-vbo-resources-destroyed logger-ref gl vbos-ref)
+    (rcglf-context-surfaces-destroyed logger-ref gl surfaces-ref)
+    (rcglt-reload-resources gl texture-map-ref))
+  render-context)

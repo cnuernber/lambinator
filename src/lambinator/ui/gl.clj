@@ -150,6 +150,8 @@ getGL"
 	gl (.getGL drawable)
 	int-array (make-array Integer/TYPE 1)]
     (dosync (ref-set todo-items-ref nil))
+    (.glPushAttrib gl GL/GL_ALL_ATTRIB_BITS)
+    (.glPushClientAttrib gl GL/GL_ALL_CLIENT_ATTRIB_BITS)
     (. gl glGetIntegerv GL/GL_FRAMEBUFFER_BINDING_EXT int-array 0)
     (doseq [item todo-items]
       (run-gl-drawable drawable item))
@@ -159,7 +161,9 @@ getGL"
       (run-gl-drawable drawable render-fn)
       (do
 	(. gl glClearColor 0.05 0.05 0.1 1.0)
-	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))))
+	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))
+    (.glPopAttrib gl)
+    (.glPopClientAttrib gl)))
     
 
 (defn- gl-display-changed 
