@@ -157,10 +157,12 @@
 	    vertex-att ((final-prog :attributes) "input_vertex_coords")
 	    [render-width render-height] ((ms-surface :surface-spec) :size)
 	    vbo-dtype (int (ms-vbo :gl-datatype))
-	    int-array (make-array Integer/TYPE 5)]
+	    int-array (make-array Integer/TYPE 5)
+	    scissor_enabled (. gl glIsEnabled GL/GL_SCISSOR_TEST)]
 	;have the child render to the multisample fbo
 	;the bind function sets where gl will render to
-	(. gl glDisable GL/GL_SCISSOR_TEST)
+	(when scissor_enabled
+	  (. gl glDisable GL/GL_SCISSOR_TEST))
 	(. gl glGetIntegerv GL/GL_FRAMEBUFFER_BINDING_EXT int-array 0)
 	(. gl glGetIntegerv GL/GL_VIEWPORT int-array 1)
 	(try
@@ -180,7 +182,8 @@
 	 (. gl glEnable GL/GL_TEXTURE_2D)
 	 (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT transfer-fbo);
 	 (maybe-transfer-texture gl transfer-surface render-context-ref)
-	 (. gl glEnable GL/GL_SCISSOR_TEST)
+	 (when scissor_enabled
+	   (. gl glEnable GL/GL_SCISSOR_TEST))
 	 ;Ensure we don't use the buffer as an accumulation buffer
 	 (. gl glDisable GL/GL_BLEND)
          ;Bind the window's render surface as the target render surface

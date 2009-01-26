@@ -159,9 +159,8 @@ getGL"
       (run-gl-drawable drawable render-fn)
       (do
 	(. gl glClearColor 0.05 0.05 0.1 1.0)
-	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))
-    (. gl glPopClientAttrib )
-    (. gl glPopAttrib )))
+	(. gl glClear GL/GL_COLOR_BUFFER_BIT)))))
+    
 
 (defn- gl-display-changed 
   [drawable modelChanged devChanged gl-window-data]
