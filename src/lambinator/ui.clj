@@ -238,11 +238,13 @@ capabilities - a GLCapabilities object or nil"
 	 retval)))
   ([appName] (ui-create-app-frame appName nil)))
 
+(defn ui-set-frame-visible [frame]
+  (.setVisible (frame :frame) true))
+
 (defn- get-menu-bar[frame]
   (let [jframe (frame :frame)]
     (.getJMenuBar jframe)))
   
-
 (defn ui-get-top-level-menu-item
   "Return a top level menu item of a particular name"
   [frame name]

@@ -53,6 +53,7 @@
       <arg value="lambinator.demo.fishparts"/>
       <arg value="lambinator.demo.functionalgraphics"/>
       <arg value="lambinator.demo.functional"/>
+      <arg value="lambinator.app_creator"/>
       <arg value="swank.swank"/>
       <arg value="swank.commands"/>
       <arg value="swank.commands.basic"/>
