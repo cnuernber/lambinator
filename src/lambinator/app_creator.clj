@@ -1,6 +1,6 @@
 (. (System/getProperties) setProperty 
    "com.apple.mrj.application.apple.menu.about.name" "App Creator")
-(ns lambinator.app_creator
+(ns lambinator.app-creator
   (:use lambinator.ui)
   (:import (javax.swing SwingUtilities))
   (:gen-class))

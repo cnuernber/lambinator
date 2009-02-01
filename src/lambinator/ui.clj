@@ -82,6 +82,7 @@ the log window text with new text"
 (defstruct ui-frame-data 
   :frame  ;JFrame 
   :win-data ;gl-window-data
+  :window-mgr ;my-doggy window manager
   :log-pane ;JPanel
   :inspector-pane ;JPanel
   :log-messages-ref ;(ref nil)
@@ -172,6 +173,7 @@ capabilities - a GLCapabilities object or nil"
 		      :frame frame
 		      :win-data win-data
 		      :log-pane log-label
+		      :window-mgr window-mgr
 		      :inspector-pane inspector
 		      :log-messages-ref (ref nil) 
 		      :log-length-ref (ref 1000)
@@ -288,3 +290,26 @@ shown-hooks-ref - called when the window is shown (including opened)"
   (let [hooks-ref (frame-data keyword)]
     (when (and hooks-ref lmbda)
       (dosync (alter hooks-ref conj lmbda)))))
+
+(defonce ui-palette-positions [:top :bottom :left :right])
+
+(defmulti ui-palette-position-to-my-doggy identity)
+(defmethod ui-palette-position-to-my-doggy :top [_] ToolWindowAnchor/TOP)
+(defmethod ui-palette-position-to-my-doggy :bottom [_] ToolWindowAnchor/BOTTOM)
+(defmethod ui-palette-position-to-my-doggy :left [_] ToolWindowAnchor/LEFT)
+(defmethod ui-palette-position-to-my-doggy :right [_] ToolWindowAnchor/RIGHT)
+
+(defn ui-add-palette 
+  "Add a new palette to the UI.
+frame - the app frame
+control - the component to add
+short-name - The short name of the component
+long-name - Long name of the component
+position - one of ui-palette-positions, defaults to right"
+  [frame component short-name long-name position]
+  (let [window-mgr (frame :window-mgr)]
+    (. window-mgr registerToolWindow short-name long-name nil component (ui-palette-position-to-my-doggy position))
+    (doseq [window (. window-mgr getToolWindows)]
+      (. window setAvailable true))))
+
+
