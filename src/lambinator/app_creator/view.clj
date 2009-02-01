@@ -1,5 +1,6 @@
 (ns lambinator.app-creator.view
-  (:use (lambinator ui))
+  (:use (lambinator ui)
+	(lambinator.app-creator.view resources))
   (:import (javax.swing JTree)))
 
 (defstruct acv-view
@@ -11,11 +12,12 @@
   "Should be called from the swing thread"
   [view-name]
   (let [app-frame (ui-create-app-frame view-name)
-	resources (JTree.)
+	resources (acvr-create)
+	res-component (acvr-get-component resources)
 	retval (struct-map acv-view
 		 :app-frame app-frame
 		 :resources resources)]
-    (ui-add-palette app-frame resources "Resources" "Resources" :left)
+    (ui-add-palette app-frame res-component "Resources" "Resources" :left)
     (ui-set-frame-visible app-frame)
     retval))
 

@@ -57,6 +57,7 @@
       <arg value="lambinator.app-creator.model"/>
       <arg value="lambinator.app-creator.model.resources"/>
       <arg value="lambinator.app-creator.view"/>
+      <arg value="lambinator.app-creator.view.resources"/>
       <arg value="swank.swank"/>
       <arg value="swank.commands"/>
       <arg value="swank.commands.basic"/>
