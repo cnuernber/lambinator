@@ -1,12 +1,13 @@
 (. (System/getProperties) setProperty 
    "com.apple.mrj.application.apple.menu.about.name" "App Creator")
 (ns lambinator.app-creator
-  (:use lambinator.ui)
+  (:use lambinator.app-creator.view
+	lambinator.ui )
   (:import (javax.swing SwingUtilities))
   (:gen-class))
 
 (defstruct ac-app
-  :app-frame)
+  :view)
 
 ;global public variable used to find the app from
 (defonce ac-active-apps (ref nil))
@@ -36,14 +37,14 @@ creation process happens on the swing thread."
        (dosync (alter ac-active-apps conj retval))
        (SwingUtilities/invokeLater 
 	(fn []
-	  (let [app-frame (ui-create-app-frame "App Creator")]
+	  (let [view (acv-create-view "App Creator")
+		app-frame (acv-get-app-frame view)]
 	    (ui-set-frame-visible app-frame)
-	    (dosync (alter retval assoc :app-frame app-frame))
+	    (dosync (alter retval assoc :view view))
 	    (ui-add-hook 
 	     app-frame 
 	     :close-hooks-ref
-	     #(ac-remove-active-app retval)
-	     )
+	     #(ac-remove-active-app retval))
 	    (doseq [[hook-key cls-hook] extra-hooks]
 	      (ui-add-hook app-frame hook-key cls-hook)))))))
   ([]
