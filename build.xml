@@ -44,6 +44,7 @@
       <arg value="lambinator.rcgl.fbo"/>
       <arg value="lambinator.rcgl.glsl"/>
       <arg value="lambinator.rcgl.vbo"/>
+      <arg value="lambinator.rcgl.image"/>
       <arg value="lambinator.util"/>
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>
