@@ -109,6 +109,12 @@
 	     `(gm-mcol ~matrix ~idx# ~rows ~columns))
 	   (range columns))])
 
+(defmacro gm-printm
+  "Print a matrix in a form that is somewhat readable"
+  [matrix rows columns]
+  `(doseq [row# (gm-mrows ~matrix ~rows ~columns)]
+     (println row#)))
+
 (defmacro gm-mm
   "Multiply one square matrix by another, assuming both have 
 identical rows and column counts"
@@ -272,7 +278,6 @@ a zero at column"
      (when (and matrix# result#)
        (gm-gj-backprop-rows matrix# result# ~rows ~columns))))
  			   
-
 (defn gm-gj-invert-44
   "Invert a 44 matrix through gauss-jordan elimination"
   [matrix]
@@ -283,6 +288,25 @@ a zero at column"
   [matrix]
   ((gm-gj-invert matrix gm-identity-33 3 3) 1))
 
+(defmacro gm-transpose
+  "Transpose a matrix"
+  [matrix rows columns]
+  `[~@(mapcat (fn [row#]
+		(map (fn [col#]
+		       `(gm-matrix-value ~matrix ~col# ~row# ~rows ~columns))
+		     (range columns)))
+	      (range rows))])
+
+(defn gm-transpose-44
+  "Transpose a 44 matrix"
+  [matrix]
+  (gm-transpose matrix 4 4))
+
+(defn gm-transpose-33
+  "Transpose a 33 matrix"
+  [matrix]
+  (gm-transpose matrix 3 3))
+
 (defn gm-scale-44
   "scale a matrix"
   [sx sy sz]
@@ -292,3 +316,61 @@ a zero at column"
   "translate a matrix"
   [tx ty tz]
   (assoc gm-identity-44 12 tx 13 ty 14 tz))
+
+
+(defn gm-axis-angle-to-quat
+  "Given an axis and an angle, return a quaternion"
+  [axis angle]
+  (let [half-angle (/ angle 2)
+	sin-angle (Math/sin half-angle)]
+    [(* (axis 0) sin-angle)
+     (* (axis 1) sin-angle)
+     (* (axis 2) sin-angle)
+     (Math/cos half-angle)]))
+
+(defn gm-quat-mult
+  "Multiply two quaternions"
+  [qL qR]
+  (let [qLx (qL 0)
+	qLy (qL 1)
+	qLz (qL 2)
+	qLw (qL 3)
+	qRx (qR 0)
+	qRy (qR 1)
+	qRz (qR 2)
+	qRw (qR 3)]
+    [(- (+ (* qLw qRx) (* qLx qRw) (* qLy qRz)) (* qLz qRy))
+     (- (+ (* qLw qRy) (* qLy qRw) (* qLz qRx)) (* qLx qRz))
+     (- (+ (* qLw qRz) (* qLz qRw) (* qLx qRy)) (* qLy qRx))
+     (- (* qLw qRw) (* qLx qRx) (* qLy qRy) (* qLz qRz))]))
+
+(defn gm-quat-to-matrix
+  "Given a quaternion, produce a 3x3 matrix"
+  [quat]
+  (let [x (quat 0)
+	y (quat 1)
+	z (quat 2)
+	w (quat 3)
+	sqx (* x x)
+	sqy (* y y)
+	sqz (* z z)
+	sqw (* w w)
+	invs (/ 1 (+ sqx sqy sqz sqw))
+	m00 (* (+ sqw (- sqx sqy sqz)) invs)
+	m11 (* (+ sqw (- sqy sqx sqz)) invs)
+	m22 (* (+ sqw (- sqz sqx sqy)) invs)
+	tmp1 (* x y)
+	tmp2 (* z w)
+	m10 (* 2 invs (+ tmp1 tmp2))
+	m01 (* 2 invs (- tmp1 tmp2))
+	tmp1 (* x z)
+	tmp2 (* y w)
+	m20 (* 2 invs (- tmp1 tmp2))
+	m02 (* 2 invs (+ tmp1 tmp2))
+	tmp1 (* y z)
+	tmp2 (* x w)
+	m21 (* 2 invs (+ tmp1 tmp2))
+	m12 (* 2 invs (- tmp1 tmp2))]
+    [m00 m01 m02
+     m10 m11 m12
+     m20 m21 m22]))

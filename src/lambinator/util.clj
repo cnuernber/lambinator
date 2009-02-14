@@ -3,7 +3,8 @@
 	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)
 	   (java.util.regex Pattern)
 	   (java.io File))
-  (:use clojure.contrib.except))
+  (:use clojure.contrib.except
+	clojure.contrib.seq-utils))
 
 (defn util-find-static-fields-by-value 
   "Given a classname and a value, return a list of static fields that match
@@ -143,3 +144,14 @@ end and surround in <html>...</html>"
 			  builder 
 			  string-seq)]
       (. builder toString))))
+
+
+(defn seq-insert
+  "Return a seq of the item inserted in a given index.
+If the index is < 1, item is inserted at the beginning.  If the
+index is > 1, item is appended as last item in sequence"
+  [coll item index]
+  (let [indexed-col (map vector coll (iterate inc 0))
+	[before after] (separate #(< (% 1) index) indexed-col)
+	new-col (concat before [[item index]] after)]
+    (map first new-col)))
