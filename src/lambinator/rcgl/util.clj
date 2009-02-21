@@ -2,7 +2,6 @@
   (:use lambinator.util)
   (:import (javax.media.opengl GL)))
 
-
 (defn rcglu-get-opengl-constant-name 
   "Given one of the ubiquitous opengl integers, find out what
 its name is by looking up its member on the static gl class 
@@ -12,7 +11,6 @@ description"
     (if field
       (. field getName)
       "")))
-
 
 (defn rcglu-get-gl-error
   "Return the current gl error."
