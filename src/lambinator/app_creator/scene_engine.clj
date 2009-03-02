@@ -7,25 +7,25 @@
 ;entries.
 
 (defstruct scene-engine
-  :scene-ref            ;ref to the scene
-  :scene-graph-map-ref  ;scene to scene graph map ref
-  :scene-graph-ref      ;scenegraph
-  :global-transforms-ref) ;scenegraph to global transforms ref
+  :scene            ;ref to the scene
+  :scene-graph-map  ;scene to scene graph map ref
+  :scene-graph      ;scenegraph
+  :global-transforms) ;scenegraph to global transforms ref
 
 (defn acse-create-engine
   "Create a new engine.  This creates a scene graph
 and the associated datastructures"
   []
   (struct-map scene-engine
-    :scene-ref (ref acs-empty-scene)
-    :scene-graph-map-ref (ref {})
-    :scene-graph-ref (ref sg-empty-graph)
-    :global-transforms-ref (ref {})))
+    :scene acs-empty-scene
+    :scene-graph-map {}
+    :scene-graph sg-empty-graph
+    :global-transforms {}))
 
 (defn acse-dirty?
   "Is this scene engine dirty"
   [engine scene]
-  (not(identical? scene @(engine :scene-ref))))
+  (not(identical? scene (engine :scene))))
 
 (defn acse-scene-item-list
   "Returns a list of nested tuples.
@@ -52,17 +52,16 @@ one for each node with a non-null item list"
 
 (defn acse-update
   "Update the engine.  Performs scene -> global xform translation.
-Returns nil; refs are updated"
+Returns a new engine"
   [engine scene]
-  (let [scene-graph-map @(engine :scene-graph-map-ref)
-	scenegraph @(engine :scene-graph-ref)
-	global-xforms @(engine :global-transforms-ref)
+  (let [scene-graph-map (engine :scene-graph-map)
+	scenegraph (engine :scene-graph)
+	global-xforms (engine :global-transforms)
 	[scene-graph-map 
 	 scenegraph] (acs-update-scenegraph scene-graph-map scene scenegraph)
 	global-xforms (sg-update-global-transforms global-xforms scenegraph)]
-    (dosync
-     (ref-set (engine :scene-graph-map-ref) scene-graph-map)
-     (ref-set (engine :scene-graph-ref) scenegraph)
-     (ref-set (engine :global-transforms-ref) global-xforms)
-     (ref-set (engine :scene-ref) scene))
-    nil))
+    (assoc engine
+      :scene-graph-map scene-graph-map
+      :scene-graph scenegraph
+      :global-transforms global-xforms
+      :scene scene)))
