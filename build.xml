@@ -59,6 +59,7 @@
       <arg value="lambinator.demo.functional"/>
       <arg value="lambinator.app-creator"/>
       <arg value="lambinator.app-creator.scene"/>
+      <arg value="lambinator.app-creator.scene-engine"/>
       <arg value="lambinator.app-creator.model"/>
       <arg value="lambinator.app-creator.model.resources"/>
       <arg value="lambinator.app-creator.view"/>
