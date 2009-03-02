@@ -38,6 +38,7 @@
       <arg value="lambinator.ui.inspector"/>
       <arg value="lambinator.ui"/>
       <arg value="lambinator.graphics-math"/>
+      <arg value="lambinator.graph-util"/>
       <arg value="lambinator.scenegraph"/>
       <arg value="lambinator.rc"/>
       <arg value="lambinator.rcgl"/>
@@ -57,6 +58,7 @@
       <arg value="lambinator.demo.functionalgraphics"/>
       <arg value="lambinator.demo.functional"/>
       <arg value="lambinator.app-creator"/>
+      <arg value="lambinator.app-creator.scene"/>
       <arg value="lambinator.app-creator.model"/>
       <arg value="lambinator.app-creator.model.resources"/>
       <arg value="lambinator.app-creator.view"/>

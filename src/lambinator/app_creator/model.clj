@@ -16,7 +16,7 @@
   :change-listeners) ;items to be notified when a property changes
 
 
-(defn acm-create-model[]
+(defonce acm-empty-model
   (struct-map model-container
     :next-id 2
     :nodes { 1 { :id 1 } }
@@ -119,6 +119,4 @@ I wouldn't recommed setting the id"
 (defn acm-get-node-parent
   "Generic, pre-named parent property getter"
   [model node-id]
-   (acm-get-node-property model node-id :parent))
-
-	
+   (acm-get-node-property model node-id :parent))	

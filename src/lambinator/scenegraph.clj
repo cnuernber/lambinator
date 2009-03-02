@@ -1,6 +1,7 @@
 (ns lambinator.scenegraph
   (:use lambinator.graphics-math
-	lambinator.util))
+	lambinator.util
+	lambinator.graph-util))
 
 ;The scene graph, right now, is just a graph of 4x4 matrixes, addressed by id.
 ;a change to the graph increments a global counter so an outside entity can
@@ -9,18 +10,15 @@
 (defstruct graph-node
   :id
   :local-transform
-  :change-index ;starts at zero.  Increments if a change should affect the global transform
   :children
   :parent)
 
 (defstruct scene-graph
-  :next-change
   :next-id
   :nodes)
 
 (defonce sg-empty-graph
   (struct-map scene-graph
-    :next-change 1
     :next-id 1
     :nodes {}))
 
@@ -31,7 +29,6 @@
 	new-node (struct-map graph-node
 		   :id id
 		   :local-transform gm-identity-44
-		   :change-index 0
 		   :children []
 		   :parent nil )
 	next-id (inc id)
@@ -46,12 +43,13 @@
 
 (defn- update-node
   [sg-graph node]
-  (let [change (sg-graph :next-change)
-	next-change (inc change)
-	id (node :id)
-	node (assoc node :change-index change)
+  (let [id (node :id)
 	nodes (assoc (sg-graph :nodes) id node)]
-    (assoc sg-graph :nodes nodes :next-change next-change)))
+    (assoc sg-graph :nodes nodes)))
+
+(defn sg-update-node
+  [sg-graph node]
+  (update-node sg-graph node))
 	
 (defn sg-set-local-transform
   "Set the local transform (4x4 matrix) on a node.  Returns a new graph"
@@ -70,40 +68,22 @@ Returns a new graph"
 	parent (when node
 		 (sg-get-node sg-graph (node :parent)))]
     (if (and node parent)
-      (let [node (assoc node :parent nil)
-	    children (parent :children)
-	    children (filter #(not (== % node-id)) children)
-	    parent (assoc parent :children children)
-	    nodes (sg-graph :nodes)
-	    nodes (assoc nodes (parent :id) parent)
-	    sg-graph (assoc sg-graph :nodes nodes)]
+      (let [sg-graph (gu-remove-child sg-graph parent node (parent :id) node-id)]
 	(update-node sg-graph node))
       sg-graph)))
 
 (defn sg-insert-child
   "Add a child to the given parent.  This will remove the child from an
 existing parent if it has one.  Appends the child to the end if index
-is nil.  Else attempts to insert the child"
+is nil.  Else attempts to insert the child.  Returns nil if either parent or
+child cannot be found"
   [sg-graph parent-id child-id index]
   (let [parent (sg-get-node sg-graph parent-id)
 	child (sg-get-node sg-graph child-id)]
-    (if (and parent child)
+    (when (and parent child)
       (let [sg-graph (sg-remove-child sg-graph child-id)
-	    children (parent :children)
-	    child-count (count children)
-	    index (if (not index)
-		    child-count
-		    (if (< index 0)
-		      (+ child-count index)
-		      index))
-	    children (seq-insert children child-id index)
-	    parent (assoc parent :children children)
-	    child (assoc child :parent parent-id)
-	    nodes (sg-graph :nodes)
-	    nodes (assoc nodes (parent :id) parent)
-	    sg-graph (assoc sg-graph :nodes nodes)]
-	(update-node sg-graph child))
-      sg-graph)))
+	    sg-graph (gu-insert-child sg-graph parent child parent-id child-id index)]
+	(update-node sg-graph child)))))
 
 (defn sg-remove-node
   "Remove a given node from the graph.  All children are orphaned.
@@ -129,13 +109,13 @@ Returns a new graph"
 
 (defstruct global-transform-info
   :node-id          ;Id of the node
-  :change-index     ;Change for which this is accurate
+  :node             ;Change for which this is accurate
   :global-transform ;global transform for transforming positions
   :inverse-transpose ) ;for transforming direction vectors (normals, binormals, tangents)
 
 (defn- perform-node-transform-update
   "Actually perform the update of the node"
-  [info parent-global local-transform change-index node-id]
+  [info parent-global local-transform node-id node]
   (let [new-global (if parent-global
 		     (gm-mm-44 parent-global local-transform)
 		     local-transform)
@@ -144,10 +124,10 @@ Returns a new graph"
 	new-33 (gm-transpose-33 new-33)]
     (if info
       [(assoc info :global-transform new-global :inverse-transpose new-33
-	      :change-index change-index) true]
+	      :node node) true]
       [(struct-map global-transform-info
 	 :node-id node-id
-	 :change-index change-index
+	 :node node
 	 :global-transform new-global
 	 :inverse-transpose new-33) true])))
   
@@ -160,15 +140,14 @@ Returns a new graph"
     ;node hierarchy
     (if node
       (let [info (last-trans node-id)
-	    change-index (node :change-index)
 	    [info perform-update] (if (or perform-update
 					  (not info)
-					  (not (== change-index (info :change-index))))
+					  (not (identical? node (info :node))))
 				    (perform-node-transform-update info 
 								   parent-global 
 								   (node :local-transform)
-								   change-index
-								   node-id)
+								   node-id
+								   node)
 				    [info false])
 	    last-trans (assoc last-trans node-id info)]
 	(reduce #(update-node-transform %1 sg-graph %2 (info :global-transform) perform-update) 
@@ -177,8 +156,15 @@ Returns a new graph"
   
 (defn sg-update-global-transforms
   "Update the map of global transforms, performing multiplies where necessary.
-Returns a new map"
+Returns a new map.  This design records the change index something is at so
+that it doesn't calculate more information than necessary."
   [last-trans sg-graph]
-  (reduce #(update-node-transform %1 sg-graph (%2 :id) gm-identity-44 false)
-	  last-trans 
-	  (sg-roots sg-graph)))
+  (let [last-trans (reduce #(update-node-transform %1 sg-graph (%2 :id) gm-identity-44 false)
+			   last-trans 
+			   (sg-roots sg-graph))]
+    (reduce (fn [last-trans node-id]
+	      (if (sg-get-node sg-graph node-id)
+		last-trans
+		(dissoc last-trans node-id)))
+	    last-trans
+	    (keys last-trans))))

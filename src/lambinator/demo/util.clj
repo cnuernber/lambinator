@@ -116,7 +116,8 @@
 
 ;;On windows I am currently unable to allocate an FBO that has a texture
 ;attachment.  I can't fathom why this is; most likely I have some gl-state
-;that isn't being initialized correctly
+;that isn't being initialized correctly.  Another possibility is that the
+;windows drivers can't handle non-power-of-two textures on FBO surfaces.
 (defn- maybe-transfer-texture[#^GL gl transfer-surface render-context-ref]
   (. gl glActiveTexture GL/GL_TEXTURE0)
   (let [transfer-tex (((transfer-surface :attachments) :color0) :texture-gl-handle)]

@@ -155,3 +155,12 @@ index is > 1, item is appended as last item in sequence"
 	[before after] (separate #(< (% 1) index) indexed-col)
 	new-col (concat before [[item index]] after)]
     (map first new-col)))
+
+(defn seq-remove
+  "Return a seq with just like the old seq but
+with the nth item removed"
+  [coll index]
+  (let [indexed-col (map vector coll (iterate inc 0))
+	retval (filter #(not(== index (% 1))) indexed-col)]
+    (map first retval)))
+	
