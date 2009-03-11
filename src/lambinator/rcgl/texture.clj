@@ -1,5 +1,6 @@
 (ns lambinator.rcgl.texture
-  (:use lambinator.rcgl.util)
+  (:use lambinator.rcgl.util
+	lambinator.util)
   (:import (javax.media.opengl GL)))
 
 (defstruct context-texture
@@ -77,5 +78,4 @@ upload any information"
 				    (tex :texture-spec)
 				    name)])
 			   @texture-map-ref)]
-    (when new-values
-      (dosync (ref-set texture-map-ref (apply hash-map new-values))))))
+    (util-update-map-ref texture-map-ref new-values)))

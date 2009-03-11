@@ -51,6 +51,8 @@
       <arg value="lambinator.util"/>
       <arg value="lambinator.fs"/>
       <arg value="lambinator.log"/>
+      <arg value="lambinator.scene"/>
+      <arg value="lambinator.scene-engine"/>
       <arg value="lambinator.demo"/>
       <arg value="lambinator.demo.util"/>
       <arg value="lambinator.demo.wave"/>
@@ -58,8 +60,6 @@
       <arg value="lambinator.demo.functionalgraphics"/>
       <arg value="lambinator.demo.functional"/>
       <arg value="lambinator.app-creator"/>
-      <arg value="lambinator.app-creator.scene"/>
-      <arg value="lambinator.app-creator.scene-engine"/>
       <arg value="lambinator.app-creator.model"/>
       <arg value="lambinator.app-creator.model.resources"/>
       <arg value="lambinator.app-creator.view"/>

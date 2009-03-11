@@ -1,4 +1,4 @@
-(ns lambinator.app-creator.scene
+(ns lambinator.scene
   (:use (lambinator graph-util util graphics-math scenegraph)))
 
 (defstruct scene
@@ -8,11 +8,11 @@
   :root-node
   :next-node-id)
 
-(defonce acs-item-types [:image])
+(defonce sn-item-types [:image])
 
 (defstruct scene-image
-  :item-type ;acs-item-types
-  :image) ;acs-image
+  :item-type ;sn-item-types
+  :image) ;sn-image
 
 (defstruct scene-node
   :id
@@ -23,7 +23,7 @@
   :items
   :children)
 
-(def acs-empty-scene-node
+(def sn-empty-scene-node
   (struct-map scene-node
     :id 0
     :translation [0 0 0]
@@ -32,18 +32,18 @@
     :items [] ;collection of items, may be an image, may be a camera, may be a light, etc.
     :children []))
 
-(defn acs-create-node
+(defn sn-create-node
   "Create a new node.
 returns [scene, node-id]"
   [scene]
   (let [node-id (scene :next-node-id)
 	next-id (inc node-id)
 	nodes (scene :nodes)
-	new-node (assoc acs-empty-scene-node :id node-id)
+	new-node (assoc sn-empty-scene-node :id node-id)
 	nodes (assoc nodes node-id new-node)]
     [(assoc scene :nodes nodes :next-node-id next-id) node-id]))
 
-(def acs-empty-scene
+(def sn-empty-scene
   (let [base-scene
 	(struct-map scene
 	  :width 800
@@ -51,10 +51,10 @@ returns [scene, node-id]"
 	  :nodes {}
 	  :root-node nil
 	  :next-node-id 1)
-	base-scene (first (acs-create-node base-scene))]
+	base-scene (first (sn-create-node base-scene))]
     (assoc base-scene :root-node 1)))
 
-(defn acs-get-node
+(defn sn-get-node
   "Return the node for a given id"
   [scene id]
   ((scene :nodes) id))
@@ -66,89 +66,89 @@ returns [scene, node-id]"
 	nodes (assoc nodes node-id node)]
     (assoc scene :nodes nodes)))
 	
-(defn acs-remove-child
+(defn sn-remove-child
   "Remove this node from its parent's child list"
   [scene node-id]
-  (let [node (acs-get-node scene node-id)]
+  (let [node (sn-get-node scene node-id)]
     (when node
       (let [parent-id (node :parent)
-	    parent (acs-get-node scene parent-id)]
+	    parent (sn-get-node scene parent-id)]
 	(if (and node parent)
 	  (gu-remove-child scene parent node parent-id node-id)
 	  scene)))))
 		
-(defn acs-insert-child
+(defn sn-insert-child
   "Insert this child into this parent's children list at index.
 Returns a new scene if both parent and child exist"
   [scene parent-id node-id index]
-  (let [node (acs-get-node scene node-id)
-	parent (acs-get-node scene parent-id)]
+  (let [node (sn-get-node scene node-id)
+	parent (sn-get-node scene parent-id)]
     (when (and node parent)
-      (let [scene (acs-remove-child scene node-id)]
+      (let [scene (sn-remove-child scene node-id)]
 	(gu-insert-child scene parent node parent-id node-id index)))))
 
-(defn acs-destroy-node
+(defn sn-destroy-node
   "Remove a node given an id.  Returns the scene.  Removes all children
 and removes this node's id from its parent's list"
   [scene node-id]
-  (let [node (acs-get-node scene node-id)
-	scene (acs-remove-child scene node-id)]
+  (let [node (sn-get-node scene node-id)
+	scene (sn-remove-child scene node-id)]
     (when node
       (let [scene (reduce (fn [child-id]
-			    (acs-remove-child scene child-id))
+			    (sn-remove-child scene child-id))
 			  scene
 			  (node :children))
 	    nodes (dissoc (scene :nodes) node-id)]
 	(assoc scene :nodes nodes)))))
 
-(defn- acs-set-node-prop
+(defn- sn-set-node-prop
   [scene node-id prop-keyword prop-val]
-  (let [node (acs-get-node scene node-id)]
+  (let [node (sn-get-node scene node-id)]
     (when node
       (let [new-node (assoc node prop-keyword prop-val)]
 	(update-node scene new-node)))))
       
-(defn acs-translate
+(defn sn-translate
   "Set a given nodes translation.  Returns a new scene if
 node-id is a valid node, nil otherwise"
   [scene node-id trans-vec]
-  (acs-set-node-prop scene node-id :translation trans-vec))
+  (sn-set-node-prop scene node-id :translation trans-vec))
 
-(defn acs-rotate
+(defn sn-rotate
   "Set a given node's rotation quaternion.  Vec should be 4 floats.
 Returns a new scene if node-id is valid, nil otherwise."
   [scene node-id rot-vec]
-  (acs-set-node-prop scene node-id :rotation rot-vec))
+  (sn-set-node-prop scene node-id :rotation rot-vec))
 
-(defn acs-scale
+(defn sn-scale
   "Set a given node's scale.  Returns a new scene if node-id is valid,
 nil otherwise"
   [scene node-id scale-vec]
-  (acs-set-node-prop scene node-id :scale scale-vec))
+  (sn-set-node-prop scene node-id :scale scale-vec))
 
-(defn acs-insert-item
+(defn sn-insert-item
   "Insert an item into the node's sequence of items.
 Returns a new scene or nil if node isn't found."
   [scene node-id item index]
-  (let [node (acs-get-node scene node-id)]
+  (let [node (sn-get-node scene node-id)]
     (when node
       (let [items (node :items)
-	    new-items (seq-insert items item index)
+	    new-items (util-seq-insert items item index)
 	    node (assoc node :items new-items)]
 	(update-node scene node)))))
 
-(defn acs-remove-item
+(defn sn-remove-item
   "Remove the item at a given index from the node's sequence of items.
 Returns a new scene or nil if node isn't found"
   [scene node-id index]
-  (let [node (acs-get-node scene node-id)]
+  (let [node (sn-get-node scene node-id)]
     (when node
       (let [items (node :items)
-	    items (seq-remove items index)
+	    items (util-seq-remove items index)
 	    node (assoc node :items items)]
 	(update-node scene node)))))
 
-(defn acs-create-image-item
+(defn sn-create-image-item
   "Create an image acs item.  You can then insert this item into
 a node's child list"
   [scene image]
@@ -223,7 +223,7 @@ a node's child list"
 
 (defn maybe-update-scenegraph-entry [scene-node-id scene-graph-map scene scenegraph]
   (let [existing (scene-graph-map scene-node-id)
-	scene-node (acs-get-node scene scene-node-id)
+	scene-node (sn-get-node scene scene-node-id)
 	[scenegraph 
 	 graph-id] (if existing
 		     [scenegraph (existing :scenegraph-id)]
@@ -242,13 +242,13 @@ a node's child list"
       (let [existing (assoc existing :scene-object scene-node)
 	    scene-graph-map (assoc scene-graph-map scene-node-id existing)]
 	(update-scenegraph-node 
-	 (acs-get-node scene scene-node-id)
+	 (sn-get-node scene scene-node-id)
 	 graph-node
 	 scene-graph-map
 	 scenegraph))
       [scene-graph-map scenegraph])))
 	      
-(defn acs-update-scenegraph
+(defn sn-update-scenegraph
   "Update the scenegraph such that the graphs are isomorphic and
 that the local transforms are proper.  Returns [scene-scenegraph-map scenegraph]"
   [scene-scenegraph-map scene scenegraph]
@@ -267,7 +267,7 @@ that the local transforms are proper.  Returns [scene-scenegraph-map scenegraph]
 	[scene-scenegraph-map 
 	 scenegraph] (reduce (fn [[scene-scenegraph-map scenegraph]
 				  scene-id]
-			       (let [scene-node (acs-get-node scene scene-id)]
+			       (let [scene-node (sn-get-node scene scene-id)]
 				 (if scene-node
 				   [scene-scenegraph-map scenegraph]
 				   (let [entry (scene-scenegraph-map scene-id)

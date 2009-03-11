@@ -6,7 +6,8 @@
 	lambinator.rcgl.fbo
 	lambinator.rcgl.glsl
 	lambinator.rcgl.vbo
-	lambinator.rcgl.texture)
+	lambinator.rcgl.texture
+	lambinator.rcgl.image)
   (:import (javax.media.opengl GL)
 	   (java.io File)))
 
@@ -17,7 +18,8 @@
   :vbo-manager
   :surfaces-ref
   :logger-ref
-  :texture-map-ref)
+  :texture-map-ref
+  :images-map-ref)
 
 (defn create-render-context [logger-ref]
   (struct-map render-context 
@@ -27,7 +29,8 @@
     :vbos-ref (ref {})
     :surfaces-ref (ref {})
     :logger-ref logger-ref
-    :texture-map-ref (ref {})))
+    :texture-map-ref (ref {})
+    :images-map-ref (ref {})))
     
 ;OK to call outside render thread.  You can find the program
 ;via the name you passed in later.
@@ -181,9 +184,29 @@
 			#(rcglt-destroy-context-texture
 			  (.getGL %)
 			  texture-map-ref
-			  name))))	
+			  name))))
 
+(defn rcgl-load-image-file
+  "Load an image file using the rcgli.  File is scheduled for load later"
+  [render-context-ref render-tasks-ref fname name]
+  (let [image-map-ref (@render-context-ref :image-map-ref)]
+    (rcgli-load-image-file render-tasks-ref image-map-ref fname name)))
 
+(defn rcgl-destroy-named-image
+  "Get rid of an image resource"
+  [render-context-ref render-tasks-ref name]
+  (let [image-map-ref (@render-context-ref :image-map-ref)]
+    (append-to-ref-list render-tasks-ref
+			(fn [_]
+			  (rcgli-destroy-named-image
+			   image-map-ref name)))))
+
+(defn rcgl-get-named-image
+  "Get an image resource"
+  [render-context name]
+  (let [image-map-ref (render-context :image-map-ref)]
+    (@image-map-ref name)))
+	
 ;This is called when all of the resources were destroyed through nefarious means.
 ;The ones that can be regenerated will be.
 ;returns a new render context

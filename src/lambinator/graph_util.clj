@@ -25,7 +25,7 @@
 		(if (< index 0)
 		  (+ child-count index)
 		  index))
-	children (seq-insert children node-id index)
+	children (util-seq-insert children node-id index)
 	parent (assoc parent :children children)
 	node (assoc node :parent parent-id)
 	nodes (graph :nodes)

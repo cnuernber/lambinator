@@ -146,7 +146,7 @@ end and surround in <html>...</html>"
       (. builder toString))))
 
 
-(defn seq-insert
+(defn util-seq-insert
   "Return a seq of the item inserted in a given index.
 If the index is < 1, item is inserted at the beginning.  If the
 index is > 1, item is appended as last item in sequence"
@@ -156,11 +156,19 @@ index is > 1, item is appended as last item in sequence"
 	new-col (concat before [[item index]] after)]
     (map first new-col)))
 
-(defn seq-remove
+(defn util-seq-remove
   "Return a seq with just like the old seq but
 with the nth item removed"
   [coll index]
   (let [indexed-col (map vector coll (iterate inc 0))
 	retval (filter #(not(== index (% 1))) indexed-col)]
     (map first retval)))
+
+(defn util-update-map-ref
+  "Update a ref map with new entries.  The entries must be
+in a sequence (not pairs).  The sequence may be nil"
+  [map-ref new-entries]
+  (let [entry-seq (seq new-entries)]
+    (when entry-seq
+      (dosync (ref-set map-ref (apply assoc @map-ref entry-seq))))))
 	

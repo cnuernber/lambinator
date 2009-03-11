@@ -1,6 +1,7 @@
 (ns lambinator.rcgl.fbo
   (:use lambinator.rcgl.util lambinator.log lambinator.rcgl
-	lambinator.rcgl.texture lambinator.rc)
+	lambinator.rcgl.texture lambinator.rc
+	lambinator.util)
   (:import (javax.media.opengl GL)))
 
 (defn- rcgl-fbo-log [log-data-ref type & args]
@@ -288,5 +289,4 @@ Opengl errors will be cleared after this function"
   (let [new-surfaces (mapcat (fn [[name surface]]
 			       [name (rcglf-create-context-surface log-data-ref gl (surface :surface-spec) (surface :name))])
 			     @surfaces-ref)]
-    (when new-surfaces
-      (dosync (ref-set surfaces-ref (apply assoc @surfaces-ref new-surfaces))))))
+    (util-update-map-ref surfaces-ref new-surfaces)))

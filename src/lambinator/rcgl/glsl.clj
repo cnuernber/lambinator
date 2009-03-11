@@ -1,5 +1,6 @@
 (ns lambinator.rcgl.glsl
-  (:use lambinator.rcgl.util lambinator.log lambinator.fs)
+  (:use lambinator.rcgl.util
+	(lambinator log fs util))
   (:import (javax.media.opengl GL)))
 
 (defn rcgl-glsl-log [log-data-ref type & args]
@@ -289,9 +290,7 @@ it will log a message and keep the existing program."
 	new-programs-list (doall (mapcat
 				  (fn [[name program]] [name (update-program log-data-ref gl shaders program)])
 				  programs-that-matter))] ;out of the programs that matter, do the update
-    (when new-programs-list ;mix the new data into the programs list		
-      (dosync (ref-set programs-ref (apply assoc @programs-ref new-programs-list))))))
-				     
+    (util-update-map-ref programs-ref new-programs-list)))
 
 (defn- finish-shader-load [log-data-ref drawable programs-ref shaders-ref bytes filename md5-hash]
   (let [gl (. drawable getGL)
@@ -381,10 +380,8 @@ it will log a message and keep the existing program."
 			       (let [{ { glslv :filename } :vert-shader { glslf :filename } :frag-shader name :name } prog]
 				 [name (create-invalid-glsl-program glslv glslf name)]))
 			     @programs-ref)]
-    (when new-shaders
-      (dosync (ref-set shaders-ref (apply assoc @shaders-ref new-shaders))))
-    (when new-programs
-      (dosync (ref-set programs-ref (apply assoc @programs-ref new-programs))))
+    (util-update-map-ref shaders-ref new-shaders)
+    (util-update-map-ref programs-ref new-programs)
     (rcglg-update-programs log-data-ref gl programs-ref shaders-ref)))
 
 (defn- glsl-shader-in-use[programs-ref filename]

@@ -85,8 +85,7 @@
 			     (not (nil? image)))
 			   new-images)
 	new-images (mapcat identity new-images)] ;create new single list
-    (dosync
-     (ref-set image-map-ref (apply hash-map new-images)))))
+    (util-update-map-ref image-map-ref new-images)))
 
 (defn rcgli-file-or-resource-to-buffered-image
   "Reads the given resource creating a buffered image.  Does a synchronous load.

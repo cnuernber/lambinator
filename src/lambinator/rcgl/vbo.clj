@@ -100,6 +100,4 @@
 				 new-vbo (rcglv-create-vbo log-data-ref gl (vbo :name) vbo-type data-seq generator)]
 			     [name new-vbo]))
 			 @vbos-ref)]
-    (when new-vbos
-      (dosync (ref-set vbos-ref (apply assoc @vbos-ref new-vbos))))))
-				 
+    (util-update-map-ref vbos-ref new-vbos)))

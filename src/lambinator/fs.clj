@@ -266,7 +266,7 @@ of the file that has changed"
 			   [fname (assoc (current-watchers fname) :mod-time mod-time)])
 			 truechanges)
 	new-entries-expanded (mapcat identity new-entries)]
-    (when new-entries
+    (when (seq new-entries)
       (doseq [[name new-entry] new-entries]
 	(doseq [[watcher-name watcher] (new-entry :watchers)]
 	  (try
