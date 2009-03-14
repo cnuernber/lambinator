@@ -20,7 +20,6 @@ that is capable of displaying html data"
   ([]
      (uiut-create-html-label nil)))
 
-
 (defn uiut-create-action-listener [lmbda]
   (proxy [Object ActionListener]
       []
