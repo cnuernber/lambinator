@@ -59,6 +59,7 @@
       <arg value="lambinator.demo.fishparts"/>
       <arg value="lambinator.demo.functionalgraphics"/>
       <arg value="lambinator.demo.functional"/>
+      <arg value="lambinator.demo.particle"/>
       <arg value="lambinator.app-creator"/>
       <arg value="lambinator.app-creator.model"/>
       <arg value="lambinator.app-creator.model.resources"/>

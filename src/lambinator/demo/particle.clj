@@ -33,12 +33,22 @@
 
 (defn- make-particles [n]
   (map (fn [i] 
-         (struct particle 
-                 true 1.0 (rand-fade)
-                 0.5 5.0 1.0 ; Just using white for now
-                 (rand-speed) (rand-speed) (rand-speed)
-                 0.0 0.0 0.0
-                 0.0 -0.8 0.0)) (range n)))
+         (struct-map particle 
+	   :active true 
+	   :life 1.0 
+	   :fade (rand-fade)
+	   :r 0.5 
+	   :b 5.0
+	   :g 1.0 ; Just using white for now
+	   :x 0.0
+	   :y 0.0
+	   :z -100.0
+	   :xi (rand-speed) 
+	   :yi (rand-speed) 
+	   :zi (rand-speed)
+	   :xg 0.0 
+	   :yg -0.8 
+	   :zg 0.0)) (range n)))
 
 (defn- update-particles [particles]
   (map (fn [p]
@@ -53,7 +63,7 @@
                 :xi xi :yi yi :zi zi
                 :life life}))) particles))
 
-(defn- draw-particles [gl particles]
+(defn- draw-particles [#^GL gl particles]
   (doseq [p particles]
     (if (:active p)
       (let [x (:x p)
@@ -94,6 +104,7 @@
       (draw-particles gl @*particles*)
       (catch javax.media.opengl.GLException e 
         (do 
+	  (.printStackTrace e)
           (println "GL ERROR: " (. glu gluErrorString (. gl glErrorCode)))
           (flush))))))
     ;(println "ERROR: " (. glu gluErrorString (. gl glGetError)))))
@@ -119,8 +130,8 @@
                   #(create-drawable-fn retval))]
     (dosync (ref-set retval ms-data))
     ;    (uigl-disable-fps-animator uigl)
-    (dosync (ref-set *particles* (make-particles 1000)))
-    (uigl-set-fps-animator uigl 5)
+    (dosync (ref-set *particles* (make-particles 100)))
+    (uigl-set-fps-animator uigl 60)
     (create-drawable-fn retval)))
 
 (defn destroy-particle-demo
