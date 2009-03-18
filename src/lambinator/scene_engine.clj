@@ -6,14 +6,14 @@
 ;and producing a list of scene items with global transform
 ;entries.
 
-(defstruct scene-engine
+(defstruct sne-scene-engine
   :scene            ;ref to the scene
   :scene-graph-map  ;scene to scene graph map ref
   :scene-graph      ;scenegraph
   :global-transforms) ;scenegraph to global transforms ref
 
 (def sne-empty-engine
-  (struct-map scene-engine
+  (struct-map sne-scene-engine
     :scene sn-empty-scene
     :scene-graph-map {}
     :scene-graph sg-empty-graph

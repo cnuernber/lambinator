@@ -4,10 +4,7 @@
   (:use lambinator.ui
      lambinator.ui.util
      lambinator.ui.inspector
-     lambinator.demo.wave
-     lambinator.demo.basic
-     lambinator.demo.particle
-     lambinator.demo.functional )
+     (lambinator.demo wave basic particle functional image))
   (:import (javax.swing SwingUtilities))
   (:gen-class))
 
@@ -19,7 +16,8 @@
   [["Wave Demo" do-create-wave-demo disable-wave-demo]
    ["Basic Demo" create-basic-demo destroy-basic-demo]
    ["Particle Demo" create-particle-demo destroy-particle-demo]
-   ["Functional Graphics" dmfn-create-demo-data dmfn-destroy-demo-data]])
+   ["Functional Graphics" dmfn-create-demo-data dmfn-destroy-demo-data]
+   ["Image" dmim-create-demo-data dmim-destroy-demo-data]])
 
 (defn dm-cleanup-current-demo [demo-data]
   (let [cleanup-fn @(demo-data :cleanup-cur-demo-ref)
@@ -57,7 +55,6 @@
       (let [menu-fn (fn [_]
                        (dm-cleanup-current-demo demo-data)
                        (switch-to-demo demo-data create destroy))]
-
         (uiut-create-menu-item name menu-fn menu-item)))
     demo-data))
 
@@ -74,7 +71,8 @@
           :close-hooks-ref 
           (fn [] 
             (dm-cleanup-current-demo demo-data)
-            (System/exit 0)))))))
+            ;(System/exit 0)
+	    ))))))
 
 
 

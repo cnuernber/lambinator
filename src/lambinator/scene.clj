@@ -1,7 +1,7 @@
 (ns lambinator.scene
   (:use (lambinator graph-util util graphics-math scenegraph)))
 
-(defstruct scene
+(defstruct sn-scene
   :width
   :height
   :nodes
@@ -10,11 +10,11 @@
 
 (defonce sn-item-types [:image])
 
-(defstruct scene-image
+(defstruct sn-scene-image
   :item-type ;sn-item-types
   :image) ;sn-image
 
-(defstruct scene-node
+(defstruct sn-scene-node
   :id
   :parent
   :translation
@@ -24,7 +24,7 @@
   :children)
 
 (def sn-empty-scene-node
-  (struct-map scene-node
+  (struct-map sn-scene-node
     :id 0
     :translation [0 0 0]
     :scale [1 1 1]
@@ -45,7 +45,7 @@ returns [scene, node-id]"
 
 (def sn-empty-scene
   (let [base-scene
-	(struct-map scene
+	(struct-map sn-scene
 	  :width 800
 	  :height 600
 	  :nodes {}
@@ -152,11 +152,11 @@ Returns a new scene or nil if node isn't found"
   "Create an image acs item.  You can then insert this item into
 a node's child list"
   [scene image]
-  (struct-map scene-image
+  (struct-map sn-scene-image
     :item-type :image
     :image image))
 
-(defstruct scene-scenegraph-item
+(defstruct sn-scene-scenegraph-item
   :scene-id
   :scene-object
   :scenegraph-id)
@@ -177,7 +177,7 @@ a node's child list"
       [scene-graph-map scenegraph (existing :scenegraph-id)]
       (let [[scenegraph node-id]
 	    (sg-create-node scenegraph)
-	    new-existing (struct-map scene-scenegraph-item
+	    new-existing (struct-map sn-scene-scenegraph-item
 			   :scene-id scene-id
 			   :scene-object nil
 			   :scenegraph-id node-id)
@@ -234,7 +234,7 @@ a node's child list"
 		    true)
 	existing (if existing
 		   existing
-		   (struct-map scene-scenegraph-item
+		   (struct-map sn-scene-scenegraph-item
 		     :scene-id scene-node-id
 		     :scene-object nil
 		     :scenegraph-id graph-id))]

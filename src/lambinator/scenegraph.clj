@@ -7,18 +7,18 @@
 ;a change to the graph increments a global counter so an outside entity can
 ;keep track of what is dirty easily.
 
-(defstruct graph-node
+(defstruct sg-graph-node
   :id
   :local-transform
   :children
   :parent)
 
-(defstruct scene-graph
+(defstruct sg-scene-graph
   :next-id
   :nodes)
 
 (defonce sg-empty-graph
-  (struct-map scene-graph
+  (struct-map sg-scene-graph
     :next-id 1
     :nodes {}))
 
@@ -26,7 +26,7 @@
   "Create a new scene graph node.  Returns [new-graph id]"
   [sg-graph]
   (let [id (sg-graph :next-id)
-	new-node (struct-map graph-node
+	new-node (struct-map sg-graph-node
 		   :id id
 		   :local-transform gm-identity-44
 		   :children []
@@ -107,7 +107,7 @@ Returns a new graph"
   [sg-graph]
   (filter #(nil? (sg-get-node sg-graph (% :parent))) (vals (sg-graph :nodes)))) 
 
-(defstruct global-transform-info
+(defstruct sg-global-transform-info
   :node-id          ;Id of the node
   :node             ;Change for which this is accurate
   :global-transform ;global transform for transforming positions
@@ -125,7 +125,7 @@ Returns a new graph"
     (if info
       [(assoc info :global-transform new-global :inverse-transpose new-33
 	      :node node) true]
-      [(struct-map global-transform-info
+      [(struct-map sg-global-transform-info
 	 :node-id node-id
 	 :node node
 	 :global-transform new-global
