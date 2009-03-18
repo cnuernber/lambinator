@@ -19,7 +19,7 @@
   :surfaces-ref
   :logger-ref
   :texture-map-ref
-  :images-map-ref)
+  :image-map-ref)
 
 (defn create-render-context [logger-ref]
   (struct-map render-context 
@@ -30,7 +30,7 @@
     :surfaces-ref (ref {})
     :logger-ref logger-ref
     :texture-map-ref (ref {})
-    :images-map-ref (ref {})))
+    :image-map-ref (ref {})))
     
 ;OK to call outside render thread.  You can find the program
 ;via the name you passed in later.

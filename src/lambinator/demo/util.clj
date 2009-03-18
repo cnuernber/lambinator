@@ -27,7 +27,7 @@
      1  1  1 1
      1 -1  1 0]))
 
-(defonce aa-choices-array [:none :2 :4 :8 :16])
+(def aa-choices-array [:none :2 :4])
 
 (defn- create-multisample-fbos[multisample-data]
   (let [{ { { drawable :gl-win :as win-data } :win-data } :frame 
@@ -169,10 +169,11 @@
 	(try
 	 (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT ms-fbo)
 	 (. gl glViewport 0 0 render-width render-height)
+	 (.glUseProgram gl 0)
 	 (child-drawable drawable)
-					;bind the multisample framebuffer as the read framebuffer source
+	;bind the multisample framebuffer as the read framebuffer source
 	 (. gl glBindFramebufferEXT GL/GL_READ_FRAMEBUFFER_EXT ms-fbo)
-					;bind the transfer as the draw framebuffer dest
+	;bind the transfer as the draw framebuffer dest
 	 (. gl glBindFramebufferEXT GL/GL_DRAW_FRAMEBUFFER_EXT transfer-fbo);
         ;downsample the multisample fbo to the draw framebuffer's texture
 	 (. gl glBlitFramebufferEXT 
@@ -238,6 +239,7 @@
 	 ;glDrawArrays takes the index count, not the polygon count or the array item count
 	 (. gl glDrawArrays GL/GL_QUADS 0 (/ (ms-vbo :item-count) 4)) ;each index has an x and y, u and v
 	 (. gl glBindTexture GL/GL_TEXTURE_2D 0)
+	 (.glUseProgram gl 0)
 	 (catch Exception e 
 	   (.printStackTrace e)))) ;make goddamn sure we don't end up with an invalid fbo bound.
       (when child-drawable ;if we can't render antialiased because we don't have buffers

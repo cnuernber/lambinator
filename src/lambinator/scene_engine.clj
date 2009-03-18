@@ -30,7 +30,7 @@
 one for each node with a non-null item list"
   [scene scene-graph-map global-xforms]
   (let [item-nodes (filter (fn [[id node]]
-			     (node :items))
+			     (seq (node :items)))
 			   (scene :nodes))
 	item-node-xforms (map (fn [[id node]]
 				(let [scene-id (node :id)

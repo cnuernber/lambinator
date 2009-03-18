@@ -17,7 +17,7 @@
    ["Basic Demo" create-basic-demo destroy-basic-demo]
    ["Particle Demo" create-particle-demo destroy-particle-demo]
    ["Functional Graphics" dmfn-create-demo-data dmfn-destroy-demo-data]
-   ["Image" dmim-create-demo-data dmim-destroy-demo-data]])
+   ["Image" #(dmim-create-demo-data %1 %2) #(dmim-destroy-demo-data %1)]])
 
 (defn dm-cleanup-current-demo [demo-data]
   (let [cleanup-fn @(demo-data :cleanup-cur-demo-ref)
