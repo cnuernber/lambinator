@@ -197,6 +197,9 @@
 (defmethod set-glsl-uniform GL/GL_INT [log-data-ref #^GL gl entry var-value]
   (. gl glUniform1i (entry :index) var-value))
 
+(defmethod set-glsl-uniform GL/GL_FLOAT_VEC2 [log-data-ref #^GL gl entry var-value]
+  (. gl glUniform2f (entry :index) (var-value 0) (var-value 1)))
+
 (defn rcglg-set-prog-uniforms 
   "Set the rcgl program uniform variables.
 - var-pair-seq is a sequence of pairs of name to value.  Based on the

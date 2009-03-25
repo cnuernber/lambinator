@@ -34,6 +34,8 @@
 	  num-samples-ref :num-samples-ref } multisample-data
 	width (. drawable getWidth)
 	height (. drawable getHeight)
+	width (util-power-of-two-equal-greater width)
+	height (util-power-of-two-equal-greater height)
 	num-samples @num-samples-ref
 	indexed-choices-array (map vector (iterate inc 0) (rest aa-choices-array))
 	[this-choice-index _] (first (filter (fn [[index choice]] (= choice num-samples)) indexed-choices-array))
@@ -142,6 +144,7 @@
   [drawable render-context-ref frame-resize-data multisample-data child-drawable]
   (let [real-gl (. drawable getGL)
 	#^GL gl (DebugGL. real-gl)
+	#^GLU glu (GLU. )
 	width (. drawable getWidth)
 	height (. drawable getHeight)
 	render-context @render-context-ref
@@ -157,6 +160,10 @@
 	    tex-att ((final-prog :attributes) "input_tex_coords")
 	    vertex-att ((final-prog :attributes) "input_vertex_coords")
 	    [render-width render-height] ((ms-surface :surface-spec) :size)
+	    view-width (min render-width width)
+	    view-height (min render-height height)
+	    range-x (float (/ view-width render-width))
+	    range-y (float (/ view-height render-height))
 	    vbo-dtype (int (ms-vbo :gl-datatype))
 	    int-array (make-array Integer/TYPE 5)
 	    scissor_enabled (. gl glIsEnabled GL/GL_SCISSOR_TEST)]
@@ -168,7 +175,7 @@
 	(. gl glGetIntegerv GL/GL_VIEWPORT int-array 1)
 	(try
 	 (. gl glBindFramebufferEXT GL/GL_FRAMEBUFFER_EXT ms-fbo)
-	 (. gl glViewport 0 0 render-width render-height)
+	 (. gl glViewport 0 0 view-width view-height)
 	 (.glUseProgram gl 0)
 	 (child-drawable drawable)
 	;bind the multisample framebuffer as the read framebuffer source
@@ -230,7 +237,8 @@
 	 (rcgl-set-glsl-uniforms
 	  @render-context-ref
 	  gl
-	  [["tex" 0]] ;set the texture param to desired logical texture unit
+	  [["tex" 0]
+	   ["UVRange" [range-x range-y]]] ;set the texture param to desired logical texture unit
 	  final-prog )
 	  ; Render Fullscreen Quad
 	 
@@ -248,23 +256,14 @@
     ;we only resize when a certain number of frames have been rendered at a certain size.
     ;this is because resizing fbos is relative expensive and can apparently lead
     ;to fragmentation of video ram (although I doubt the second claim)
-    (let [resize-frame-count (@frame-resize-data :resize-frame-count)
-	  [rs-width rs-height] (@frame-resize-data :resize-frame-size)
-	  resize-frame-count (if (and (== rs-width width)
-				      (== rs-height height))
-			       (inc resize-frame-count)
-			       0)
-	  fbos-missing (or (not ms-surface)
+    (let [fbos-missing (or (not ms-surface)
 			   (not transfer-surface))
-	  fbos-size-mismatch (or fbos-missing
-				 (not (= ((ms-surface :surface-spec) :size)
-					 [width height])))
-	  do-resize-fbo (or fbos-missing
-			    (and fbos-size-mismatch
-				 (> resize-frame-count 10)))]
-      (dosync (ref-set frame-resize-data (assoc @frame-resize-data 
-					   :resize-frame-count resize-frame-count
-					   :resize-frame-size [width height])))
+	  [ms-width ms-height] (if fbos-missing
+				 [0 0]
+				 ((ms-surface :surface-spec) :size))
+	  fbos-size-mismatch (or (< ms-width width)
+				 (< ms-height height))
+	  do-resize-fbo (or fbos-missing fbos-size-mismatch)]
       (when do-resize-fbo
 	(create-multisample-fbos multisample-data)))
     (when ms-surface

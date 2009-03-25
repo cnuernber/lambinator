@@ -171,4 +171,23 @@ in a sequence (not pairs).  The sequence may be nil"
   (let [entry-seq (seq new-entries)]
     (when entry-seq
       (dosync (ref-set map-ref (apply assoc @map-ref entry-seq))))))
-	
+
+(defn util-power-of-two-greater
+  "Returns the nearest power of two number greater than the
+value passed in"
+  [value]
+  (let [greater (bit-shift-left value 1)
+	count (loop [value (bit-shift-right value 1)
+		     count 1]
+		(if (== value 0)
+		  count
+		  (recur (bit-shift-right value 1) (inc count))))]
+    (bit-shift-left 1 count)))
+
+(defn util-power-of-two-equal-greater
+  "Returns the nearest power of two equal to or greater than
+value passed in"
+  [value]
+  (if (== 0 (mod value 2))
+    value
+    (util-power-of-two-greater value)))
