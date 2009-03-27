@@ -63,6 +63,18 @@
 	 (rcgl-create-context-surface-seq rc rl ms-spec-seq "wave-multisample-surface"))
        (rcgl-create-context-surface-seq rc rl trans-spec-seq "wave-transfer-surface")))))
 
+(def dmut-square-vbo-name "dmut-square-vbo")
+
+(defn dmut-create-square-vbo
+  "Create the square vbo used for multisample rendering among other things.  Meant
+to be called under uigl-with-render-context-ref-and-todo-list-ref"
+  [rc rl]
+  (rcgl-create-vbo rc rl dmut-square-vbo-name :data #(generate-multisample-vbo)))
+
+(defn dmut-destroy-square-vbo
+  [rc rl]
+  (rcgl-delete-vbo rc rl dmut-square-vbo-name))
+  
 (defn dmut-create-multisample-render-data
   "Create the data necessary for a multisample render pass"
   [multisample-data]
@@ -76,7 +88,7 @@
       "/data/glsl/passthrough.glslv" 
       "/data/glsl/single_texture.glslf"
       "wave-final-render-prog")
-     (rcgl-create-vbo rc rl "wave-multisample-vbo" :data #(generate-multisample-vbo))))
+     (dmut-create-square-vbo rc rl)))
   nil)
 
 (defn dmut-delete-multisample-render-data
@@ -88,7 +100,7 @@
      (rcgl-delete-context-surface rc rl "wave-multisample-surface")
      (rcgl-delete-context-surface rc rl "wave-transfer-surface")
      (rcgl-delete-glsl-program rc rl "wave-final-render-prog")
-     (rcgl-delete-vbo rc rl "wave-multisample-vbo")))
+     (dmut-destroy-square-vbo rc rl)))
   nil)
 
 (defn- get-or-create-transfer-texture[gl render-context-ref size]
@@ -139,7 +151,50 @@
 	(. gl glBindTexture GL/GL_TEXTURE_2D ms-texture)
 	;(. gl glReadBuffer GL/GL_COLOR_ATTACHMENT0_EXT)
 	(. gl glCopyTexImage2D GL/GL_TEXTURE_2D 0 internal-format 0 0 width height 0)))))
-      
+
+(defn dmut-render-setup-square-vbo
+  "Setup the square vbo, binding the texture coords to tex-att
+and the vertex coords to vertex-att.
+gl - GL interface
+render-context - unref'd rcgl render context
+vertex-att - vertex attribute ((final-prog :attributes) 'input_vertex-coords'
+tex-att - texture attribute ((final-prog :attributes) 'input_tex_coords')"
+  [#^GL gl render-context vertex-att tex-att]
+  (let [ms-vbo (rcgl-get-vbo render-context dmut-square-vbo-name)]
+    (when ms-vbo
+      (let [vbo-dtype (ms-vbo :gl-datatype)]
+	(. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) (ms-vbo :gl-handle))
+	(when vertex-att
+	  (. gl glEnableVertexAttribArray (vertex-att :index))
+	  (. gl glVertexAttribPointer 
+	     (vertex-att :index) ;index
+	     (int 2)       ;size
+	     vbo-dtype     ;type
+	     false         ;normalized
+	     (int 16)       ;stride
+	     (long 0)))      ;offset
+	(when tex-att
+	  (. gl glEnableVertexAttribArray (tex-att :index))
+	  (. gl glVertexAttribPointer 
+	     (tex-att :index)    ;index
+	     (int 2)             ;size
+	     vbo-dtype           ;type
+	     false               ;normalized
+	     (int 16)            ;stride
+	     (long 8)))))))      ;offset
+
+(defn dmut-render-square-vbo
+  [#^GL gl]
+  (. gl glDrawArrays GL/GL_QUADS 0 4)) ;each index (4 indexes) has an x and y, u and v
+
+(defn dmut-render-teardown-square-vbo
+  "Teardown the square vbo, call just after your drawelements call"
+  [#^GL gl tex-att vertex-att]
+  (doto gl
+    (.glBindBuffer 0 0)
+    (.glDisableVertexAttribArray (vertex-att :index))
+    (.glDisableVertexAttribArray (tex-att :index))))
+  
 (defn- antialiasing-drawable-wrapper
   [drawable render-context-ref frame-resize-data multisample-data child-drawable]
   (let [real-gl (. drawable getGL)
@@ -151,7 +206,7 @@
 	ms-surface (rcgl-get-context-surface render-context "wave-multisample-surface")
 	transfer-surface (rcgl-get-context-surface render-context "wave-transfer-surface")
 	final-prog (rcgl-get-glsl-program render-context "wave-final-render-prog")
-	ms-vbo (rcgl-get-vbo render-context "wave-multisample-vbo")
+	ms-vbo (rcgl-get-vbo render-context dmut-square-vbo-name)
 	do-aa-render (and ms-surface transfer-surface final-prog child-drawable ms-vbo)]
     (if do-aa-render
       (let [ms-fbo (ms-surface :gl-handle)
@@ -206,8 +261,6 @@
 	 (. gl glMatrixMode GL/GL_MODELVIEW)
 	 (. gl glLoadIdentity)
 	 (. gl glUseProgram prog-handle)
-
-	 (. gl glBindBuffer (rcglv-gl-type-from-vbo-type (ms-vbo :type)) (ms-vbo :gl-handle))
 	 
 	 (rcglt-tex2d-param gl GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
 	 (rcglt-tex2d-param gl GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
@@ -216,24 +269,7 @@
          ;we have how bound the second set of texture coordinates to tex coord 0
 	 ;each tex coord takes two entries, they have a stride of 4
 	 ;and they are offset from the beginning of the array by two
-	 (when vertex-att
-	   (. gl glEnableVertexAttribArray (vertex-att :index))
-	   (. gl glVertexAttribPointer 
-	      (vertex-att :index) ;index
-	      (int 2)       ;size
-	      vbo-dtype     ;type
-	      false         ;normalized
-	      (int 16)       ;stride
-	      (long 0)))      ;offset
-	 (when tex-att
-	   (. gl glEnableVertexAttribArray (tex-att :index))
-	   (. gl glVertexAttribPointer 
-	      (tex-att :index) ;index
-	      (int 2)       ;size
-	      vbo-dtype     ;type
-	      false         ;normalized
-	      (int 16)       ;stride
-	      (long 8)))      ;offset
+	 (dmut-render-setup-square-vbo gl render-context vertex-att tex-att)
 	 (rcgl-set-glsl-uniforms
 	  @render-context-ref
 	  gl
@@ -242,10 +278,8 @@
 	  final-prog )
 	  ; Render Fullscreen Quad
 	 
-	 ;(. gl glClearColor 1.0 1.0 0.0 1.0)
-	 ;(. gl glClear GL/GL_COLOR_BUFFER_BIT)
 	 ;glDrawArrays takes the index count, not the polygon count or the array item count
-	 (. gl glDrawArrays GL/GL_QUADS 0 (/ (ms-vbo :item-count) 4)) ;each index has an x and y, u and v
+	 (dmut-render-square-vbo gl)
 	 (. gl glBindTexture GL/GL_TEXTURE_2D 0)
 	 (.glUseProgram gl 0)
 	 (catch Exception e 

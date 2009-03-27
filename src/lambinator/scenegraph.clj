@@ -113,15 +113,19 @@ Returns a new graph"
   :global-transform ;global transform for transforming positions
   :inverse-transpose ) ;for transforming direction vectors (normals, binormals, tangents)
 
+(defn- to-float-vector
+  [vec]
+  (apply vector (map float vec)))
+
 (defn- perform-node-transform-update
   "Actually perform the update of the node"
   [info parent-global local-transform node-id node]
   (let [new-global (if parent-global
-		     (gm-mm-44 parent-global local-transform)
+		     (to-float-vector (gm-mm-44 parent-global local-transform))
 		     local-transform)
 	new-33 (gm-upper-33 new-global)
 	new-33 (gm-gj-invert-33 new-33)
-	new-33 (gm-transpose-33 new-33)]
+	new-33 (to-float-vector (gm-transpose-33 new-33))]
     (if info
       [(assoc info :global-transform new-global :inverse-transpose new-33
 	      :node node) true]

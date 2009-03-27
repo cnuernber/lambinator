@@ -200,6 +200,12 @@
 (defmethod set-glsl-uniform GL/GL_FLOAT_VEC2 [log-data-ref #^GL gl entry var-value]
   (. gl glUniform2f (entry :index) (var-value 0) (var-value 1)))
 
+(defmethod set-glsl-uniform GL/GL_FLOAT_MAT3 [log-data-ref #^GL gl entry var-value]
+  (.glUniformMatrix3fv gl (entry :index) 9 false (into-array Float/TYPE var-value) 0))
+
+(defmethod set-glsl-uniform GL/GL_FLOAT_MAT4 [log-data-ref #^GL gl entry var-value]
+  (.glUniformMatrix4fv gl (entry :index) 16 false (into-array Float/TYPE var-value) 0))
+
 (defn rcglg-set-prog-uniforms 
   "Set the rcgl program uniform variables.
 - var-pair-seq is a sequence of pairs of name to value.  Based on the

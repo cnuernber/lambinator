@@ -317,3 +317,11 @@ inFPS - the new fps to run things at"
   (let [{drawable :gl-win} gl-window-data]
     (.revalidate drawable)
     (.repaint drawable)))
+
+(defn uigl-load-glsl
+  "Load a glslv file, used from the repl"
+  [gl-window-data fname]
+  (uigl-with-render-context-ref-and-todo-list-ref 
+   gl-window-data
+   (fn [rc rl]
+     (rcgl-load-shader rc rl fname))))

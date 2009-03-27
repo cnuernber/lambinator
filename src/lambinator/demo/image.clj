@@ -5,7 +5,8 @@
 	lambinator.ui.inspector
 	lambinator.scene
 	lambinator.scene-engine
-	lambinator.rcgl)
+	lambinator.rcgl
+	lambinator.rcgl.texture)
   (:import (javax.media.opengl GL DebugGL)
 	   (javax.media.opengl.glu GLU)))
 
@@ -44,31 +45,45 @@
 	  scene (engine :scene)
 	  scene-graph-map (engine :scene-graph-map)
 	  global-xforms (engine :global-transforms)
-	  item-nodes (sne-scene-item-list scene scene-graph-map global-xforms)]
-      (doseq [[node [global inv-tpos]] item-nodes]
-	(let [item (first (node :items))
-	      name (item :image)
-	      render-image (rcgl-get-named-image @render-context-ref name)]
-	  (when render-image
-	    (let [texture (render-image :gl-image)
-		  handle (render-image :gl-handle)
-		  tex-width (float (.getWidth texture))
-		  tex-height (float (.getHeight texture))
-		  half-width (/ tex-width 2.0)
-		  half-height (/ tex-height 2.0)]
-	      (doto gl
-		(.glBegin GL/GL_QUADS)
-		(.glColor3f 1.0 0.0 0.0)
-		(.glVertex2f (- half-width) (- half-height) )
-		(.glColor3f 0.0 1.0 0.0)
-		(.glVertex2f half-width (- half-height))
-		(.glColor3f 0.0 0.0 1.0)
-		(.glVertex2f half-width half-height)
-		(.glVertex2f (- half-width) half-height)
-		(.glEnd))
-	      )))))
-    (catch Exception e (.printStackTrace e)))
-    ))
+	  render-context @render-context-ref
+	  item-nodes (sne-scene-item-list scene scene-graph-map global-xforms)
+	  ms-vbo (rcgl-get-vbo render-context dmut-square-vbo-name)
+	  image-prog (rcgl-get-glsl-program render-context "basic_image")]
+      (when (and ms-vbo image-prog)
+	(let [tex-att ((image-prog :attributes) "input_tex_coords")
+	      vertex-att ((image-prog :attributes) "input_vertex_coords")]
+	(.glEnable gl GL/GL_TEXTURE_2D)
+	(.glUseProgram gl (image-prog :gl-handle))
+	(dmut-render-setup-square-vbo gl render-context vertex-att tex-att)
+	(doseq [[node [global inv-tpos]] item-nodes]
+	  (let [item (first (node :items))
+		name (item :image)
+		render-image (rcgl-get-named-image @render-context-ref name)]
+	    (when render-image
+	      (let [texture (render-image :gl-image)
+		    handle (render-image :gl-handle)
+		    tex-width (float (.getWidth texture))
+		    tex-height (float (.getHeight texture))]
+		(rcglt-tex2d-param gl GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
+		(rcglt-tex2d-param gl GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
+		(rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
+		(rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
+		(.glActiveTexture gl GL/GL_TEXTURE0)
+		(.glBindTexture gl GL/GL_TEXTURE_2D handle)
+		(rcgl-set-glsl-uniforms 
+		 render-context
+		 gl
+		 [["tex" 0]
+		  ["global_transform" global]
+		  ["inverse_tpos" inv-tpos]
+		  ["image_pixel_size" [tex-width tex-height]]]
+		 image-prog)
+		(dmut-render-square-vbo gl)
+		(. gl glBindTexture GL/GL_TEXTURE_2D 0)
+		(.glDisable gl GL/GL_TEXTURE_2D)
+		(.glUseProgram gl 0)
+		)))))))
+    (catch Exception e (.printStackTrace e)))))
 	      
 (defn- create-and-set-drawable-fn[demo-data-ref]
   (let [multisample-data (@demo-data-ref :multisample-data)
@@ -96,7 +111,9 @@
 	uigl (ui-get-gl-window-data frame)]
     (uigl-with-render-context-ref-and-todo-list-ref 
      uigl
-     #(rcgl-destroy-named-image %1 %2 "blue_angle_swirl"))
+     (fn [rc rl]
+       (rcgl-destroy-named-image rc rl "blue_angle_swirl")
+       (dmut-destroy-square-vbo rc rl)))
     (dmut-delete-multisample-render-data multisample-data)))
 
 (defn dmim-create-demo-data
@@ -123,8 +140,15 @@ retval - empty ref to hold return value"
 	    (ref-set scene-ref scene))
     (uii-setup-inspector-panel (frame :inspector-pane) [(ms-data :inspector-item)])
     (uigl-with-render-context-ref-and-todo-list-ref 
-     uigl 
-     #(rcgl-load-image-file %1 %2 "/data/images/blue_angle_swirl.jpg" "blue_angle_swirl"))
+     uigl
+     (fn [rc rl]
+       (rcgl-load-image-file rc rl "/data/images/blue_angle_swirl.jpg" "blue_angle_swirl")
+       (rcgl-create-glsl-program rc 
+				 rl 
+				 "/data/glsl/basic_image.glslv" 
+				 "/data/glsl/basic_image.glslf" 
+				 "basic_image" )
+       (dmut-create-square-vbo rc rl)))
     
     ;(uigl-set-fps-animator uigl 5)
     (create-and-set-drawable-fn retval)))
