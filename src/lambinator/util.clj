@@ -2,7 +2,8 @@
   (:import (java.lang.reflect Modifier)
 	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)
 	   (java.util.regex Pattern)
-	   (java.io File))
+	   (java.io File)
+	   (java.util Timer TimerTask Date))
   (:use clojure.contrib.except
 	clojure.contrib.seq-utils))
 
@@ -191,3 +192,39 @@ value passed in"
   (if (== 0 (mod value 2))
     value
     (util-power-of-two-greater value)))
+
+(defn util-create-timer
+  "Create a new timer object
+returns the timer object"
+  []
+  (Timer. ))
+
+(defn- create-timer-task [lmbda] 
+  (proxy [TimerTask] []
+    (run 
+     []
+     (lmbda))))
+
+
+(defn util-add-timer-task
+  "Add a new task to the existing timer
+timer - item returned by util-create-timer
+lambda - function taking no arguments to be called
+milliseconds - milliseconds between callbacks
+
+returns a function that if called will cancel
+this specific timer task"
+  [timer lambda milliseconds]
+  (let [task (create-timer-task lambda)]
+    (.schedule 
+     timer
+     task
+     (Date.)
+     (long milliseconds))
+    (fn [] (.cancel task))))
+
+(defn util-cancel-timer
+  "Cancel all the tasks associated with a timer.
+This disables the timer for further use."
+  [timer]
+  (.cancel timer))

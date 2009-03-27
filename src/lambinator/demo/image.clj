@@ -16,6 +16,41 @@
   :multisample-data  ;multisample demo data
   :frame )           ;frame
 
+(defn- render-basic-image
+  "Render a basic image.  You need to have setup the dmut-square-vbo."
+  [#^GL gl render-context img-name global-xform inv-tpos]
+  (let [ms-vbo (rcgl-get-vbo render-context dmut-square-vbo-name)
+	image-prog (rcgl-get-glsl-program render-context "basic_image")
+	render-image (rcgl-get-named-image render-context img-name)]
+    (when (and ms-vbo image-prog render-image)
+      (let [tex-att ((image-prog :attributes) "input_tex_coords")
+	    vertex-att ((image-prog :attributes) "input_vertex_coords")
+	    texture (render-image :gl-image)
+	    handle (render-image :gl-handle)
+	    tex-width (float (.getWidth texture))
+	    tex-height (float (.getHeight texture))]
+	(.glEnable gl GL/GL_TEXTURE_2D)
+	(.glUseProgram gl (image-prog :gl-handle))
+	(dmut-render-setup-square-vbo gl render-context vertex-att tex-att)
+	(rcglt-tex2d-param gl GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
+	(rcglt-tex2d-param gl GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
+	(rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
+	(rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
+	(.glActiveTexture gl GL/GL_TEXTURE0)
+	(.glBindTexture gl GL/GL_TEXTURE_2D handle)
+	(rcgl-set-glsl-uniforms 
+	 render-context
+	 gl
+	 [["tex" 0]
+	  ["global_transform" global-xform]
+	  ["inverse_tpos" inv-tpos]
+	  ["image_pixel_size" [tex-width tex-height]]]
+	 image-prog)
+	(dmut-render-square-vbo gl)
+	(.glBindTexture gl GL/GL_TEXTURE_2D 0)
+	(.glDisable gl GL/GL_TEXTURE_2D)
+	(.glUseProgram gl 0)))))
+
 (defn- render-images [drawable render-context-ref scene-ref scene-engine-ref]
   (let [#^GL gl (DebugGL. (.getGL drawable))
 	#^GLU glu (GLU.)
@@ -46,43 +81,11 @@
 	  scene-graph-map (engine :scene-graph-map)
 	  global-xforms (engine :global-transforms)
 	  render-context @render-context-ref
-	  item-nodes (sne-scene-item-list scene scene-graph-map global-xforms)
-	  ms-vbo (rcgl-get-vbo render-context dmut-square-vbo-name)
-	  image-prog (rcgl-get-glsl-program render-context "basic_image")]
-      (when (and ms-vbo image-prog)
-	(let [tex-att ((image-prog :attributes) "input_tex_coords")
-	      vertex-att ((image-prog :attributes) "input_vertex_coords")]
-	(.glEnable gl GL/GL_TEXTURE_2D)
-	(.glUseProgram gl (image-prog :gl-handle))
-	(dmut-render-setup-square-vbo gl render-context vertex-att tex-att)
-	(doseq [[node [global inv-tpos]] item-nodes]
-	  (let [item (first (node :items))
-		name (item :image)
-		render-image (rcgl-get-named-image @render-context-ref name)]
-	    (when render-image
-	      (let [texture (render-image :gl-image)
-		    handle (render-image :gl-handle)
-		    tex-width (float (.getWidth texture))
-		    tex-height (float (.getHeight texture))]
-		(rcglt-tex2d-param gl GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
-		(rcglt-tex2d-param gl GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
-		(rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
-		(rcglt-tex2d-param gl GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
-		(.glActiveTexture gl GL/GL_TEXTURE0)
-		(.glBindTexture gl GL/GL_TEXTURE_2D handle)
-		(rcgl-set-glsl-uniforms 
-		 render-context
-		 gl
-		 [["tex" 0]
-		  ["global_transform" global]
-		  ["inverse_tpos" inv-tpos]
-		  ["image_pixel_size" [tex-width tex-height]]]
-		 image-prog)
-		(dmut-render-square-vbo gl)
-		(. gl glBindTexture GL/GL_TEXTURE_2D 0)
-		(.glDisable gl GL/GL_TEXTURE_2D)
-		(.glUseProgram gl 0)
-		)))))))
+	  item-nodes (sne-scene-item-list scene scene-graph-map global-xforms)]
+      (doseq [[node [global inv-tpos]] item-nodes]
+	(let [item (first (node :items))
+	      img-name (item :image)]
+	  (render-basic-image gl render-context img-name global inv-tpos))))
     (catch Exception e (.printStackTrace e)))))
 	      
 (defn- create-and-set-drawable-fn[demo-data-ref]
@@ -114,6 +117,7 @@
      (fn [rc rl]
        (rcgl-destroy-named-image rc rl "blue_angle_swirl")
        (dmut-destroy-square-vbo rc rl)))
+    (uigl-disable-todo-watcher uigl)
     (dmut-delete-multisample-render-data multisample-data)))
 
 (defn dmim-create-demo-data
@@ -149,6 +153,5 @@ retval - empty ref to hold return value"
 				 "/data/glsl/basic_image.glslf" 
 				 "basic_image" )
        (dmut-create-square-vbo rc rl)))
-    
-    ;(uigl-set-fps-animator uigl 5)
+    (uigl-enable-todo-watcher uigl)
     (create-and-set-drawable-fn retval)))

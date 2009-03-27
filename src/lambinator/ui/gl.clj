@@ -4,7 +4,8 @@
 	   (com.sun.opengl.util FPSAnimator)
 	   (java.util.concurrent CountDownLatch)
 	   (javax.swing SwingUtilities JScrollPane ScrollPaneConstants)
-	   (java.awt Dimension))
+	   (java.awt Dimension)
+	   	   )
   (:use lambinator.rcgl lambinator.rc lambinator.util lambinator.log lambinator.ui.util))
 
 
@@ -24,7 +25,8 @@
   :gl-dimensions-ref   ;currently known dimensions
   :render-context-ref  ;reference to render context
   :gl-render-fn-ref    ;render function, run every display
-  :animator-ref         ;ref to the animator item for this window
+  :animator-ref        ;ref to the animator item for this window
+  :timer-ref           ;ref to the timer used for watching the todo list
   )
 
 
@@ -209,7 +211,8 @@ logger_ref reference to a logger or nil"
 		      :gl-dimensions-ref (ref [0 0 0 0])
 		      :render-context-ref (ref (create-render-context logger_ref))
 		      :gl-render-fn-ref (ref nil)
-		      :animator-ref (ref nil))	
+		      :animator-ref (ref nil)
+		      :timer-ref (ref nil))	
 	listener (create-gl-event-listener 
 		  window-data)]
     (. panel addGLEventListener listener)
@@ -325,3 +328,28 @@ inFPS - the new fps to run things at"
    gl-window-data
    (fn [rc rl]
      (rcgl-load-shader rc rl fname))))
+
+(defn uigl-todo-watcher-enabled? 
+  [gl-window-data]
+  (not (nil? @(gl-window-data :timer-ref))))
+
+(defn uigl-disable-todo-watcher
+  [gl-window-data]
+  (when (uigl-todo-watcher-enabled? gl-window-data)
+    (let [timer-ref (gl-window-data :timer-ref)]
+      (util-cancel-timer @timer-ref)
+      (dosync (ref-set timer-ref nil)))))
+
+(defn uigl-enable-todo-watcher
+  "Start up a timer that watches the todo list and
+calls repaint any time the list has items in it.  Useful
+for systems where you want to repaint when things are loaded"
+  [gl-window-data]
+  (when-not (uigl-todo-watcher-enabled? gl-window-data)
+    (let [new-timer (util-create-timer)
+	  todo-ref (gl-window-data :gl-todo-list-ref)
+	  lambda (fn []
+		   (when-not (== 0 (count @todo-ref))
+		     (uigl-repaint gl-window-data)))]
+      (util-add-timer-task new-timer lambda 300)
+      (dosync (ref-set (gl-window-data :timer-ref) new-timer)))))

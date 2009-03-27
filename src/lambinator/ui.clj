@@ -92,17 +92,6 @@ the log window text with new text"
   :hidden-hooks-ref ;(ref nil)
   :shown-hooks-ref) ;(ref nil)
 
-(defn- cancel-filemod-time [filemod-timer]
-  (when @filemod-timer
-    (. @filemod-timer cancel)
-    (dosync (ref-set filemod-timer nil))))
-
-(defn- create-timer-task [lmbda] 
-  (proxy [TimerTask] []
-    (run 
-     []
-     (lmbda))))
-
 (defn- check-and-update-log-window[log-messages-ref my-messages-ref log-window]
   (when-not (= @my-messages-ref @log-messages-ref)
     (dosync (ref-set my-messages-ref @log-messages-ref))
@@ -187,7 +176,7 @@ capabilities - a GLCapabilities object or nil"
 			       (windowClosing[_]
 				(. frame setVisible false)
 				(. frame dispose)
-				(cancel-filemod-time filemod-timer)
+				(util-cancel-timer @filemod-timer)
 				(run-hook-list retval :close-hooks-ref)
 				;destroy the render context
 				(dosync (ref-set render-context-ref (create-render-context logger-ref)))
@@ -199,7 +188,7 @@ capabilities - a GLCapabilities object or nil"
 	     component-listener (proxy [Object ComponentListener] []
 				  (componentHidden
 				   [_] 
-				   (cancel-filemod-time filemod-timer)
+				   (util-cancel-timer @filemod-timer)
 				   (run-hook-list retval :hidden-hooks-ref))
 				  (componentMoved[_] )
 				  (componentResized[_] )
@@ -207,22 +196,19 @@ capabilities - a GLCapabilities object or nil"
 				   [_]
 				   (try
 				    (when (not @filemod-timer)
-				      (dosync (ref-set filemod-timer (Timer.)))
-				      (. @filemod-timer 
-					 schedule  
-					 (create-timer-task #(fs-mod-system-check-files file-mod-watcher-system ))
-					 (Date.) 
-					 (long 300))
+				      (dosync (ref-set filemod-timer (util-create-timer)))
+				      (util-add-timer-task 
+				       @filemod-timer
+				       #(fs-mod-system-check-files file-mod-watcher-system )
+				       300)
 				      (let [printed-messages-ref (ref nil)]
-					(. @filemod-timer 
-					   schedule  
-					   (create-timer-task #(check-and-update-log-window 
-								(retval :log-messages-ref) 
-								printed-messages-ref 
-								log-label))
-					   (Date.) 
-					   (long 300))))
-				    
+					(util-add-timer-task
+					 @filemod-timer
+					 #(check-and-update-log-window 
+					   (retval :log-messages-ref) 
+					   printed-messages-ref 
+					   log-label)
+					 300)))
 				    (catch Exception e
 				      (. e printStackTrace)))
 				   (run-hook-list retval :shown-hooks-ref)))]
