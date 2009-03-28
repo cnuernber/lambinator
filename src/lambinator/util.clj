@@ -228,3 +228,17 @@ this specific timer task"
 This disables the timer for further use."
   [timer]
   (.cancel timer))
+
+(defn util-unsigned-less-equal
+  "Compare two integers as if they were unsigned
+returns true if x is less than or equal to y, taking into
+account 2's complement"
+  [x y]
+  (if (>= x 0)
+    (if (>= y 0)
+      (<= x y) ;both positive, compare normally
+      true) ;y negative and x pos, true
+    (if (>= y 0)
+      false ;y positive x negative, false
+      (<= x y)))) ;if both negative, compare normally
+    

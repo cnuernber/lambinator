@@ -353,3 +353,17 @@ for systems where you want to repaint when things are loaded"
 		     (uigl-repaint gl-window-data)))]
       (util-add-timer-task new-timer lambda 300)
       (dosync (ref-set (gl-window-data :timer-ref) new-timer)))))
+
+(defn uigl-add-mouse-input-listener
+  "Listener created via uiut-create-mouse-input-listener"
+  [gl-window-data input-listener]
+  (let [win (gl-window-data :gl-win)]
+    (.addMouseMotionListener win input-listener)
+    (.addMouseListener win input-listener)))
+
+(defn uigl-remove-mouse-input-listener
+  "Remove a listener created before"
+  [gl-window-data input-listener]
+    (let [win (gl-window-data :gl-win)]
+    (.removeMouseMotionListener win input-listener)
+    (.removeMouseListener win input-listener)))
