@@ -5,7 +5,7 @@
      lambinator.ui.util
      lambinator.ui.inspector
      (lambinator.demo wave basic particle functional image))
-  (:import (javax.swing SwingUtilities))
+  (:import (javax.swing SwingUtilities UIManager))
   (:gen-class))
 
 (defstruct demo-data :frame :cleanup-cur-demo-ref :cur-demo-data-ref)
@@ -63,6 +63,8 @@
   []
   (SwingUtilities/invokeLater 
     (fn []
+      (UIManager/setLookAndFeel 
+       (UIManager/getSystemLookAndFeelClassName))
       (let [frame (ui-create-app-frame "Cool Demos")
             demo-data (dm-create-all-demos-menu frame)]
         (. (frame :frame) setVisible true)
