@@ -37,6 +37,7 @@
       <arg value="lambinator.ui.gl"/>
       <arg value="lambinator.ui.inspector"/>
       <arg value="lambinator.ui"/>
+      <arg value="lambinator.lwjgl"/>
       <arg value="lambinator.graphics-math"/>
       <arg value="lambinator.graph-util"/>
       <arg value="lambinator.scenegraph"/>
