@@ -248,4 +248,7 @@ account 2's complement"
     (if (>= y 0)
       false ;y positive x negative, false
       (<= x y)))) ;if both negative, compare normally
-    
+
+(defn util-direct-int-buffer [size]
+  (let [byte-buffer (ByteBuffer/allocateDirect (* size 4))]
+    (.asIntBuffer byte-buffer)))
