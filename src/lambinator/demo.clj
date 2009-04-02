@@ -78,5 +78,5 @@
 
 
 
-(defn- -main [& args]
+(defn -main [& args]
   (dm-setup-all-demos))

@@ -78,13 +78,13 @@ means that it is valid and framebuffer-complete"
     (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal-format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl-attach-pt GL/GL_RENDERBUFFER_EXT rb-handle)
+    (println "create non textured")
     (struct context-renderbuffer rb-handle 0 (rcglu-get-gl-error gl))))
 
 (defn- create-and-bind-textured-renderbuffer[gl internal-format width height external-format external-datatype attach-pt binding-func]
-  (let [rb-handle (allocate-opengl-framebuffer-renderbuffer gl)
-	tex-handle (rcglt-allocate-opengl-texture-handle gl)]
-    (. gl glBindRenderbufferEXT GL/GL_RENDERBUFFER_EXT rb-handle)
+  (let [tex-handle (rcglt-allocate-opengl-texture-handle gl)]
     (. gl glBindTexture GL/GL_TEXTURE_2D tex-handle)
+    (println "create textured")
     (when binding-func
       (binding-func))
     (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal-format width height 0 external-format external-datatype nil)
@@ -92,7 +92,7 @@ means that it is valid and framebuffer-complete"
        GL/GL_FRAMEBUFFER_EXT 
        (gl-attachment-point-from-rc-attachment-point attach-pt) GL/GL_TEXTURE_2D 
        tex-handle 0)
-    (struct context-renderbuffer rb-handle tex-handle (rcglu-get-gl-error gl))))
+    (struct context-renderbuffer 0 tex-handle (rcglu-get-gl-error gl))))
 
 
 (defmulti create-context-rb (fn [gl attach-pt renderbuffer width height] [(renderbuffer :type) (renderbuffer :use-texture)]))
@@ -167,6 +167,7 @@ is relatively easy to create invalid surface specs"
 	fbo-handle (allocate-opengl-framebuffer-object gl)
 	[width height] (sspec :size)
 	num-samples (sspec :multi-sample)]
+    (println "fore!!")
     (try
      (if has-multi-sample
        (rcgl-fbo-log log-data-ref :info "creating multi-sample context surface: " name " , number of samples: " num-samples )
@@ -290,3 +291,97 @@ Opengl errors will be cleared after this function"
 			       [name (rcglf-create-context-surface log-data-ref gl (surface :surface-spec) (surface :name))])
 			     @surfaces-ref)]
     (util-update-map-ref surfaces-ref new-surfaces)))
+
+(defn rcglf-test-create-textured-fbo[drawable width height]
+  (let [id-array (make-array Integer/TYPE 4)
+	#^GL gl (.getGL drawable)]
+    (.glEnable gl GL/GL_TEXTURE_2D)
+    (.glGenTextures gl 1 id-array 0)
+    (.glBindTexture gl GL/GL_TEXTURE_2D (aget id-array 0))
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR_MIPMAP_LINEAR)
+
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
+    (.glTexImage2D gl GL/GL_TEXTURE_2D 0 GL/GL_RGBA8 width height 0 GL/GL_RGBA GL/GL_UNSIGNED_BYTE nil)
+    (.glBindTexture gl GL/GL_TEXTURE_2D, 0)
+    
+
+    (.glGenRenderbuffersEXT gl 1 id-array 1)
+    (.glBindRenderbufferEXT gl GL/GL_RENDERBUFFER_EXT (aget id-array 1))
+    (.glRenderbufferStorageEXT gl GL/GL_RENDERBUFFER_EXT GL/GL_DEPTH_COMPONENT  width height )
+    (.glBindRenderbufferEXT gl GL/GL_RENDERBUFFER_EXT 0)
+
+    (.glGenFramebuffersEXT gl 1 id-array 2)
+    (.glBindFramebufferEXT gl GL/GL_FRAMEBUFFER_EXT (aget id-array 2))
+    
+    (.glFramebufferTexture2DEXT gl GL/GL_FRAMEBUFFER_EXT GL/GL_COLOR_ATTACHMENT0_EXT GL/GL_TEXTURE_2D (aget id-array 0) 0)
+
+    (.glFramebufferRenderbufferEXT gl GL/GL_FRAMEBUFFER_EXT GL/GL_DEPTH_ATTACHMENT_EXT GL/GL_RENDERBUFFER_EXT (aget id-array 1))
+    (let [status (.glCheckFramebufferStatusEXT gl GL/GL_FRAMEBUFFER_EXT)]
+      (println status)
+      (.glBindFramebufferEXT gl GL/GL_FRAMEBUFFER_EXT 0)
+      status)))
+
+(defn- get-print-gl-data[#^GL gl constant data-array]
+  (.glGetIntegerv gl constant data-array 0)
+  (println (rcglu-get-opengl-constant-name constant) (aget data-array 0)))
+
+(defn- get-print-gl-datac[#^GL gl constant data-array]
+  (.glGetIntegerv gl constant data-array 0)
+  (println (rcglu-get-opengl-constant-name constant) 
+	   (rcglu-get-opengl-constant-name (aget data-array 0))))
+
+(defn rcglf-print-buffer-status [drawable]
+  (let [gl (.getGL drawable)
+	data-array (make-array Integer/TYPE 4)
+	print-constant (fn print-constant 
+			 [constant] 
+			 (get-print-gl-data gl constant data-array))]
+    (print-constant GL/GL_DRAW_BUFFER)
+    (print-constant GL/GL_READ_BUFFER)
+    (print-constant GL/GL_PACK_SWAP_BYTES)
+    (print-constant GL/GL_PACK_LSB_FIRST)
+    (print-constant GL/GL_PACK_ROW_LENGTH)
+    (print-constant GL/GL_PACK_SKIP_ROWS)
+    (print-constant GL/GL_PACK_ALIGNMENT)
+    (print-constant GL/GL_UNPACK_SWAP_BYTES)
+    (print-constant GL/GL_UNPACK_LSB_FIRST)
+    (print-constant GL/GL_UNPACK_ROW_LENGTH)
+    (print-constant GL/GL_UNPACK_SKIP_ROWS)
+    (print-constant GL/GL_UNPACK_ALIGNMENT)
+
+    (print-constant GL/GL_MAP_COLOR)
+    (print-constant GL/GL_MAP_STENCIL)
+    (print-constant GL/GL_INDEX_SHIFT)
+    (print-constant GL/GL_INDEX_OFFSET)
+    (print-constant GL/GL_RED_SCALE)
+    (print-constant GL/GL_RED_BIAS)
+    (print-constant GL/GL_GREEN_SCALE)
+    (print-constant GL/GL_GREEN_BIAS)
+    (print-constant GL/GL_BLUE_SCALE)
+    (print-constant GL/GL_BLUE_BIAS)
+    (print-constant GL/GL_ALPHA_SCALE)
+    (print-constant GL/GL_ALPHA_BIAS)
+    (print-constant GL/GL_DEPTH_SCALE)
+    (print-constant GL/GL_DEPTH_BIAS)
+    (print-constant GL/GL_POST_COLOR_MATRIX_RED_SCALE)
+    (print-constant GL/GL_POST_COLOR_MATRIX_RED_BIAS)
+    (print-constant GL/GL_POST_COLOR_MATRIX_GREEN_SCALE)
+    (print-constant GL/GL_POST_COLOR_MATRIX_GREEN_BIAS)
+    (print-constant GL/GL_POST_COLOR_MATRIX_BLUE_SCALE)
+    (print-constant GL/GL_POST_COLOR_MATRIX_BLUE_BIAS)
+    (print-constant GL/GL_POST_COLOR_MATRIX_ALPHA_SCALE)
+    (print-constant GL/GL_POST_COLOR_MATRIX_ALPHA_BIAS)
+    (print-constant GL/GL_POST_CONVOLUTION_RED_SCALE)
+    (print-constant GL/GL_POST_CONVOLUTION_RED_BIAS)
+    (print-constant GL/GL_POST_CONVOLUTION_GREEN_SCALE)
+    (print-constant GL/GL_POST_CONVOLUTION_GREEN_BIAS)
+    (print-constant GL/GL_POST_CONVOLUTION_BLUE_SCALE)
+    (print-constant GL/GL_POST_CONVOLUTION_BLUE_BIAS)
+    (print-constant GL/GL_POST_CONVOLUTION_ALPHA_SCALE)
+    (print-constant GL/GL_POST_CONVOLUTION_ALPHA_BIAS)
+
+    (println (.glIsEnabled gl GL/GL_TEXTURE_2D))
+    (println (.glIsEnabled gl GL/GL_TEXTURE_CUBE_MAP))
+    ))

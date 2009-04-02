@@ -1,12 +1,13 @@
 (ns lambinator.ui.gl
-  (:import (javax.media.opengl GLJPanel GLEventListener GL GLCapabilities)
+  (:import (javax.media.opengl GLJPanel GLEventListener GL GLCapabilities GLCanvas)
 	   (java.awt GridBagLayout GridBagConstraints)
 	   (com.sun.opengl.util FPSAnimator)
 	   (java.util.concurrent CountDownLatch)
 	   (javax.swing SwingUtilities JScrollPane ScrollPaneConstants)
 	   (java.awt Dimension)
 	   	   )
-  (:use lambinator.rcgl lambinator.rc lambinator.util lambinator.log lambinator.ui.util))
+  (:use lambinator.rcgl lambinator.rc lambinator.util lambinator.log lambinator.ui.util
+	lambinator.rcgl.fbo ))
 
 
 ;Items looked up using glGetString
@@ -126,6 +127,8 @@ getGL"
   "Called upon initialization of the gl system"
   [drawable gl-window-data]
   (let [render-context-ref (gl-window-data :render-context-ref)]
+    (rcglf-test-create-textured-fbo drawable 256 256)
+    (rcglf-print-buffer-status drawable)
     (uigl-log-message gl-window-data :info "gl initialized, rebuilding render context")
     (try
      (update-gl-system-strs drawable (gl-window-data :gl-system-strs-ref))
