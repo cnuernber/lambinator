@@ -1,6 +1,6 @@
 (ns lambinator.util
   (:import (java.lang.reflect Modifier)
-	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer)
+	   (java.nio ByteBuffer IntBuffer FloatBuffer ShortBuffer ByteOrder)
 	   (java.util.regex Pattern)
 	   (java.io File)
 	   (java.util Timer TimerTask Date))
@@ -251,4 +251,5 @@ account 2's complement"
 
 (defn util-direct-int-buffer [size]
   (let [byte-buffer (ByteBuffer/allocateDirect (* size 4))]
+    (.order byte-buffer (ByteOrder/nativeOrder))
     (.asIntBuffer byte-buffer)))

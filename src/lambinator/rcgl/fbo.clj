@@ -78,16 +78,18 @@ means that it is valid and framebuffer-complete"
     (. gl glRenderbufferStorageEXT GL/GL_RENDERBUFFER_EXT internal-format width height)
     (. gl glFramebufferRenderbufferEXT 
        GL/GL_FRAMEBUFFER_EXT gl-attach-pt GL/GL_RENDERBUFFER_EXT rb-handle)
-    (println "create non textured")
     (struct context-renderbuffer rb-handle 0 (rcglu-get-gl-error gl))))
 
 (defn- create-and-bind-textured-renderbuffer[gl internal-format width height external-format external-datatype attach-pt binding-func]
   (let [tex-handle (rcglt-allocate-opengl-texture-handle gl)]
     (. gl glBindTexture GL/GL_TEXTURE_2D tex-handle)
-    (println "create textured")
     (when binding-func
       (binding-func))
     (. gl glTexImage2D GL/GL_TEXTURE_2D 0 internal-format width height 0 external-format external-datatype nil)
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
     (. gl glFramebufferTexture2DEXT 
        GL/GL_FRAMEBUFFER_EXT 
        (gl-attachment-point-from-rc-attachment-point attach-pt) GL/GL_TEXTURE_2D 
@@ -167,7 +169,6 @@ is relatively easy to create invalid surface specs"
 	fbo-handle (allocate-opengl-framebuffer-object gl)
 	[width height] (sspec :size)
 	num-samples (sspec :multi-sample)]
-    (println "fore!!")
     (try
      (if has-multi-sample
        (rcgl-fbo-log log-data-ref :info "creating multi-sample context surface: " name " , number of samples: " num-samples )
@@ -299,14 +300,12 @@ Opengl errors will be cleared after this function"
     (.glGenTextures gl 1 id-array 0)
     (.glBindTexture gl GL/GL_TEXTURE_2D (aget id-array 0))
     (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MAG_FILTER GL/GL_LINEAR)
-    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR_MIPMAP_LINEAR)
-
+    (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_MIN_FILTER GL/GL_LINEAR)
     (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_S GL/GL_CLAMP_TO_EDGE)
     (.glTexParameterf gl GL/GL_TEXTURE_2D GL/GL_TEXTURE_WRAP_T GL/GL_CLAMP_TO_EDGE)
     (.glTexImage2D gl GL/GL_TEXTURE_2D 0 GL/GL_RGBA8 width height 0 GL/GL_RGBA GL/GL_UNSIGNED_BYTE nil)
     (.glBindTexture gl GL/GL_TEXTURE_2D, 0)
     
-
     (.glGenRenderbuffersEXT gl 1 id-array 1)
     (.glBindRenderbufferEXT gl GL/GL_RENDERBUFFER_EXT (aget id-array 1))
     (.glRenderbufferStorageEXT gl GL/GL_RENDERBUFFER_EXT GL/GL_DEPTH_COMPONENT  width height )
@@ -319,7 +318,6 @@ Opengl errors will be cleared after this function"
 
     (.glFramebufferRenderbufferEXT gl GL/GL_FRAMEBUFFER_EXT GL/GL_DEPTH_ATTACHMENT_EXT GL/GL_RENDERBUFFER_EXT (aget id-array 1))
     (let [status (.glCheckFramebufferStatusEXT gl GL/GL_FRAMEBUFFER_EXT)]
-      (println status)
       (.glBindFramebufferEXT gl GL/GL_FRAMEBUFFER_EXT 0)
       status)))
 

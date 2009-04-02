@@ -127,8 +127,6 @@ getGL"
   "Called upon initialization of the gl system"
   [drawable gl-window-data]
   (let [render-context-ref (gl-window-data :render-context-ref)]
-    (rcglf-test-create-textured-fbo drawable 256 256)
-    (rcglf-print-buffer-status drawable)
     (uigl-log-message gl-window-data :info "gl initialized, rebuilding render context")
     (try
      (update-gl-system-strs drawable (gl-window-data :gl-system-strs-ref))
